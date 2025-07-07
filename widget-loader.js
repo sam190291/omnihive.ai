@@ -28,7 +28,7 @@
     }
     
     // Build widget URL with agent parameter
-    const widgetUrl = 'https://yourusername.github.io/ai-voice-widget/?agent=' + encodeURIComponent(agentId);
+    const widgetUrl = 'https://sam190291.github.io/omnihive.ai/?agent=' + encodeURIComponent(agentId);
 
     // Create iframe
     const iframe = document.createElement('iframe');
