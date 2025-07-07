@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Assistant</title>
+    <style>
+        /* Hide ALL Branding */
+        [data-testid*="branding"],
+        [data-testid*="powered"],
+        [class*="branding"],
+        [class*="powered"],
+        [class*="elevenlabs"],
+        [aria-label*="ElevenLabs"],
+        [aria-label*="Powered by"],
+        [title*="ElevenLabs"],
+        [title*="Powered by"],
+        a[href*="elevenlabs"],
+        a[href*="conversational-ai"],
+        .elevenlabs-branding,
+        .powered-by-elevenlabs,
+        .branding-text,
+        .footer-branding,
+        .widget-branding,
+        .convai-branding,
+        [data-branding],
+        [data-powered-by],
+        [data-elevenlabs],
+        elevenlabs-convai::part(branding),
+        elevenlabs-convai::part(footer),
+        elevenlabs-convai::part(powered-by),
+        elevenlabs-convai footer,
+        elevenlabs-convai .footer,
+        elevenlabs-convai [class*="footer"],
+        elevenlabs-convai > div:last-child,
+        elevenlabs-convai [class*="bottom"],
+        elevenlabs-convai [class*="attribution"],
+        elevenlabs-convai iframe[src*="elevenlabs"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            height: 0 !important;
+            width: 0 !important;
+            overflow: hidden !important;
+        }
+
+        elevenlabs-convai *[style*="font-size: 12px"],
+        elevenlabs-convai *[style*="font-size: 10px"],
+        elevenlabs-convai *[style*="font-size: 11px"] {
+            display: none !important;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #666;
+            font-size: 16px;
+        }
+
+        .error {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #e74c3c;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading">Loading AI Assistant...</div>
+    
+    <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+
+    <script>
+        // Get agent ID from URL parameter
+        function getAgentId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const agentId = urlParams.get('agent');
+            
+            if (!agentId) {
+                showError('No agent ID provided. Please add ?agent=YOUR_AGENT_ID to the URL.');
+                return null;
+            }
+            
+            return agentId;
+        }
+
+        function showError(message) {
+            const loading = document.getElementById('loading');
+            loading.innerHTML = `
+                <div class="error">
+                    <h3>Configuration Error</h3>
+                    <p>${message}</p>
+                    <small>Example: ?agent=agent_01jxjyk81cfqrs9zer2vsp4h7e</small>
+                </div>
+            `;
+        }
+
+        // Initialize widget with dynamic agent ID
+        function initializeWidget() {
+            const agentId = getAgentId();
+            if (!agentId) return;
+            
+            // Create widget element
+            const widgetElement = document.createElement('elevenlabs-convai');
+            widgetElement.setAttribute('agent-id', agentId);
+            
+            // Replace loading with widget
+            const loading = document.getElementById('loading');
+            loading.style.display = 'none';
+            document.body.appendChild(widgetElement);
+            
+            // Start branding cleanup
+            setTimeout(hideBranding, 500);
+            setTimeout(hideBranding, 1000);
+            setTimeout(hideBranding, 2000);
+            setTimeout(hideBranding, 3000);
+            setTimeout(hideBranding, 5000);
+            setTimeout(hideBranding, 8000);
+            setTimeout(hideBranding, 10000);
+        }
+
+        function hideBranding() {
+            const allElements = document.querySelectorAll('*');
+            allElements.forEach(el => {
+                if (el.textContent && (
+                    el.textContent.toLowerCase().includes('powered by elevenlabs') ||
+                    el.textContent.toLowerCase().includes('elevenlabs') ||
+                    el.textContent.toLowerCase().includes('conversational ai') ||
+                    el.textContent.toLowerCase().includes('powered by')
+                )) {
+                    if (el.textContent.trim().length < 100 && !el.querySelector('elevenlabs-convai')) {
+                        el.style.display = 'none';
+                        el.style.visibility = 'hidden';
+                        el.style.opacity = '0';
+                        el.style.height = '0';
+                        el.style.width = '0';
+                        el.style.overflow = 'hidden';
+                    }
+                }
+            });
+
+            const widget = document.querySelector('elevenlabs-convai');
+            if (widget && widget.shadowRoot) {
+                try {
+                    const shadowElements = widget.shadowRoot.querySelectorAll('*');
+                    shadowElements.forEach(el => {
+                        if (el.textContent && (
+                            el.textContent.toLowerCase().includes('powered by') ||
+                            el.textContent.toLowerCase().includes('elevenlabs')
+                        )) {
+                            el.style.display = 'none';
+                        }
+                    });
+                } catch (e) {}
+            }
+        }
+
+        // Monitor for dynamic content
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    setTimeout(hideBranding, 100);
+                }
+            });
+        });
+
+        // Wait for ElevenLabs script to load, then initialize
+        let checkCount = 0;
+        const checkInterval = setInterval(() => {
+            if (window.customElements && window.customElements.get('elevenlabs-convai')) {
+                clearInterval(checkInterval);
+                initializeWidget();
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            } else if (checkCount++ > 50) { // 5 second timeout
+                clearInterval(checkInterval);
+                initializeWidget(); // Try anyway
+            }
+        }, 100);
+    </script>
+</body>
+</html>
