@@ -84,6 +84,20 @@
     <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
 
     <script>
+        // State management
+        let currentState = 'closed';
+        let isInFrame = window.parent !== window;
+        
+        // Send state to parent window
+        function sendStateToParent(state) {
+            if (isInFrame) {
+                window.parent.postMessage({
+                    type: 'widget-state',
+                    state: state
+                }, '*');
+            }
+        }
+        
         // Get agent ID from URL parameter
         function getAgentId() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -130,6 +144,9 @@
             setTimeout(hideBranding, 5000);
             setTimeout(hideBranding, 8000);
             setTimeout(hideBranding, 10000);
+            
+            // Monitor widget state changes
+            setTimeout(monitorWidgetState, 1000);
         }
 
         function hideBranding() {
@@ -168,6 +185,53 @@
             }
         }
 
+        // Monitor widget state changes
+        function monitorWidgetState() {
+            const widget = document.querySelector('elevenlabs-convai');
+            if (!widget) {
+                setTimeout(monitorWidgetState, 500);
+                return;
+            }
+
+            // Check if widget is expanded or minimized
+            function checkWidgetState() {
+                try {
+                    // Look for indicators of expanded state
+                    const isExpanded = widget.shadowRoot && 
+                        widget.shadowRoot.querySelector('[class*="expanded"], [class*="open"], [class*="active"]');
+                    
+                    // Alternative: check for conversation/chat elements
+                    const hasConversation = widget.shadowRoot &&
+                        widget.shadowRoot.querySelector('[class*="conversation"], [class*="chat"], [class*="messages"]');
+                    
+                    // Alternative: check widget size
+                    const rect = widget.getBoundingClientRect();
+                    const isLargeSize = rect.width > 100 || rect.height > 100;
+                    
+                    const newState = (isExpanded || hasConversation || isLargeSize) ? 'open' : 'closed';
+                    
+                    if (newState !== currentState) {
+                        currentState = newState;
+                        sendStateToParent(currentState);
+                    }
+                } catch (e) {
+                    // Fallback: assume closed if can't detect
+                    if (currentState !== 'closed') {
+                        currentState = 'closed';
+                        sendStateToParent(currentState);
+                    }
+                }
+            }
+
+            // Check state periodically
+            setInterval(checkWidgetState, 500);
+            
+            // Also check on clicks
+            document.addEventListener('click', () => {
+                setTimeout(checkWidgetState, 100);
+            });
+        }
+
         // Monitor for dynamic content
         const observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
@@ -192,6 +256,11 @@
                 initializeWidget(); // Try anyway
             }
         }, 100);
+
+        // Initial state notification
+        setTimeout(() => {
+            sendStateToParent('closed');
+        }, 1000);
     </script>
 </body>
 </html>
