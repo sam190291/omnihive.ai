@@ -9,7 +9,6 @@
             }
         }
         
-        // Fallback: look for the current script
         const currentScript = document.currentScript;
         if (currentScript) {
             const agentId = currentScript.getAttribute('data-agent-id');
@@ -22,224 +21,168 @@
     const agentId = getAgentIdFromScript();
     
     if (!agentId) {
-        console.error('AI Widget: No agent ID provided. Please add data-agent-id attribute to the script tag.');
+        console.error('AI Widget: No agent ID provided.');
         return;
     }
     
-    // Build widget URL with agent parameter
-    const widgetUrl = 'https://sam190291.github.io/omnihive.ai/?agent=' + encodeURIComponent(agentId);
+    // Create floating button first
+    const floatingButton = document.createElement('div');
+    floatingButton.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        border-radius: 50%;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        cursor: pointer;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        color: white;
+        font-size: 24px;
+    `;
     
-    // Create iframe with pointer-events: none initially
+    floatingButton.innerHTML = '💬';
+    
+    // Add hover effect
+    floatingButton.addEventListener('mouseenter', function() {
+        floatingButton.style.transform = 'scale(1.1)';
+        floatingButton.style.boxShadow = '0 6px 25px rgba(0,0,0,0.4)';
+    });
+    
+    floatingButton.addEventListener('mouseleave', function() {
+        floatingButton.style.transform = 'scale(1)';
+        floatingButton.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+    });
+    
+    // Create iframe (hidden initially)
     const iframe = document.createElement('iframe');
+    const widgetUrl = 'https://sam190291.github.io/omnihive.ai/?agent=' + encodeURIComponent(agentId);
     iframe.src = widgetUrl;
     iframe.frameBorder = '0';
     iframe.setAttribute('allow', 'microphone');
     
-    // Start with small size and click-through enabled
     iframe.style.cssText = `
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 80px;
-        height: 80px;
-        z-index: 9999;
+        width: 380px;
+        height: 520px;
+        z-index: 9998;
         border: none;
-        border-radius: 50%;
+        border-radius: 20px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         transition: all 0.3s ease;
-        pointer-events: auto;
-        overflow: hidden;
+        transform: scale(0);
+        opacity: 0;
+        pointer-events: none;
+        transform-origin: bottom right;
     `;
     
-    let isExpanded = false;
-    let clickDetectionEnabled = true;
+    let isOpen = false;
     
-    // Function to detect if widget is visually expanded
-    function checkIfWidgetExpanded() {
-        if (!clickDetectionEnabled) return;
-        
-        try {
-            // Check if iframe content suggests expansion
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-            if (iframeDoc) {
-                // Look for expanded elements
-                const hasExpandedElements = iframeDoc.querySelector('[class*="expanded"], [class*="open"], [class*="active"]');
-                return !!hasExpandedElements;
-            }
-        } catch (e) {
-            // Cross-origin restrictions - use alternative detection
+    // Toggle widget
+    function toggleWidget() {
+        if (isOpen) {
+            closeWidget();
+        } else {
+            openWidget();
         }
-        
-        // Alternative: detect clicks on the iframe itself
-        return false;
     }
     
-    // Handle iframe clicks
-    iframe.addEventListener('load', function() {
-        // Enable click detection on the iframe
-        iframe.addEventListener('click', function(e) {
-            if (!isExpanded) {
-                // First click - expand the widget
-                expandWidget();
-                e.preventDefault();
-            }
-        });
+    function openWidget() {
+        isOpen = true;
+        floatingButton.style.display = 'none';
+        iframe.style.transform = 'scale(1)';
+        iframe.style.opacity = '1';
+        iframe.style.pointerEvents = 'auto';
         
-        // Monitor for escape key or outside clicks to collapse
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && isExpanded) {
-                collapseWidget();
-            }
-        });
-        
-        // Click outside to collapse
-        document.addEventListener('click', function(e) {
-            if (isExpanded && !iframe.contains(e.target)) {
-                // Add small delay to allow widget interactions
-                setTimeout(() => {
-                    collapseWidget();
-                }, 100);
-            }
-        });
-    });
-    
-    // Expand widget function
-    function expandWidget() {
-        if (isExpanded) return;
-        
-        isExpanded = true;
-        const isMobile = window.innerWidth <= 768;
-        
-        if (isMobile) {
+        // Mobile responsive
+        if (window.innerWidth <= 768) {
             iframe.style.width = 'calc(100vw - 20px)';
             iframe.style.height = '70vh';
             iframe.style.maxWidth = '380px';
             iframe.style.bottom = '10px';
             iframe.style.right = '10px';
-        } else {
-            iframe.style.width = '380px';
-            iframe.style.height = '520px';
-            iframe.style.bottom = '20px';
-            iframe.style.right = '20px';
         }
-        
-        iframe.style.borderRadius = '20px';
-        iframe.style.pointerEvents = 'auto';
-        
-        // Send expand message to widget
-        try {
-            iframe.contentWindow.postMessage({ type: 'expand' }, '*');
-        } catch (e) {}
     }
     
-    // Collapse widget function
-    function collapseWidget() {
-        if (!isExpanded) return;
+    function closeWidget() {
+        isOpen = false;
+        floatingButton.style.display = 'flex';
+        iframe.style.transform = 'scale(0)';
+        iframe.style.opacity = '0';
+        iframe.style.pointerEvents = 'none';
         
-        isExpanded = false;
-        iframe.style.width = '80px';
-        iframe.style.height = '80px';
-        iframe.style.borderRadius = '50%';
+        // Reset mobile styles
+        iframe.style.width = '380px';
+        iframe.style.height = '520px';
         iframe.style.bottom = '20px';
         iframe.style.right = '20px';
-        iframe.style.pointerEvents = 'auto';
-        
-        // Send collapse message to widget
-        try {
-            iframe.contentWindow.postMessage({ type: 'collapse' }, '*');
-        } catch (e) {}
     }
+    
+    // Button click handler
+    floatingButton.addEventListener('click', toggleWidget);
+    
+    // Close on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && isOpen) {
+            closeWidget();
+        }
+    });
+    
+    // Close on outside click
+    document.addEventListener('click', function(e) {
+        if (isOpen && !iframe.contains(e.target) && !floatingButton.contains(e.target)) {
+            closeWidget();
+        }
+    });
     
     // Handle window resize
     window.addEventListener('resize', function() {
-        if (isExpanded) {
-            expandWidget();
+        if (isOpen) {
+            openWidget(); // Reapply responsive styles
         }
     });
     
-    // Auto-collapse after period of inactivity
-    let inactivityTimer;
-    function resetInactivityTimer() {
-        clearTimeout(inactivityTimer);
-        if (isExpanded) {
-            inactivityTimer = setTimeout(() => {
-                collapseWidget();
-            }, 30000); // 30 seconds of inactivity
-        }
-    }
-    
-    // Monitor mouse movement over iframe
-    iframe.addEventListener('mouseenter', resetInactivityTimer);
-    iframe.addEventListener('mouseleave', resetInactivityTimer);
-    
-    // Add hover effect for closed state
-    iframe.addEventListener('mouseenter', function() {
-        if (!isExpanded) {
-            iframe.style.transform = 'scale(1.1)';
-            iframe.style.boxShadow = '0 15px 40px rgba(0,0,0,0.3)';
-        }
-    });
-    
-    iframe.addEventListener('mouseleave', function() {
-        if (!isExpanded) {
-            iframe.style.transform = 'scale(1)';
-            iframe.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
-        }
-    });
-    
-    // Initialize widget
-    function initializeWidget() {
+    // Initialize
+    function init() {
+        document.body.appendChild(floatingButton);
         document.body.appendChild(iframe);
         
-        // Add widget controls
-        addWidgetControls();
-    }
-    
-    // Add manual controls for testing
-    function addWidgetControls() {
-        const controls = document.createElement('div');
-        controls.style.cssText = `
+        // Add status indicator
+        const status = document.createElement('div');
+        status.style.cssText = `
             position: fixed;
-            top: 60px;
+            top: 20px;
             left: 20px;
             background: rgba(0, 0, 0, 0.8);
             color: white;
-            padding: 10px;
+            padding: 10px 15px;
             border-radius: 10px;
-            z-index: 10000;
-            font-size: 12px;
+            font-size: 14px;
+            z-index: 1000;
             font-family: Arial, sans-serif;
         `;
         
-        controls.innerHTML = `
-            <div>Widget Controls:</div>
-            <button onclick="window.aiWidget.expand()" style="margin: 2px; padding: 5px 10px; font-size: 10px;">Expand</button>
-            <button onclick="window.aiWidget.collapse()" style="margin: 2px; padding: 5px 10px; font-size: 10px;">Collapse</button>
-            <div>Status: <span id="widget-status">Closed</span></div>
-        `;
+        function updateStatus() {
+            status.textContent = `Widget: ${isOpen ? 'Open' : 'Closed'} | Clicks: ${isOpen ? 'Blocked' : 'Allowed'}`;
+        }
         
-        document.body.appendChild(controls);
+        updateStatus();
+        setInterval(updateStatus, 500);
         
-        // Expose global controls
-        window.aiWidget = {
-            expand: expandWidget,
-            collapse: collapseWidget,
-            isExpanded: () => isExpanded
-        };
-        
-        // Update status
-        const statusEl = document.getElementById('widget-status');
-        setInterval(() => {
-            if (statusEl) {
-                statusEl.textContent = isExpanded ? 'Open' : 'Closed';
-            }
-        }, 500);
+        document.body.appendChild(status);
     }
     
-    // Wait for DOM to be ready
+    // Wait for DOM
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeWidget);
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        initializeWidget();
+        init();
     }
 })();
