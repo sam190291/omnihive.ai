@@ -25,56 +25,9 @@
         return;
     }
     
-    let isOpen = false;
-    let widgetContainer = null;
     let elevenLabsWidget = null;
-    
-    // Create floating button
-    function createFloatingButton() {
-        const button = document.createElement('div');
-        button.id = 'ai-widget-button';
-        button.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            border-radius: 50%;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            cursor: pointer;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-            color: white;
-            font-size: 24px;
-            user-select: none;
-        `;
-        
-        button.innerHTML = '💬';
-        
-        // Add hover effects
-        button.addEventListener('mouseenter', function() {
-            button.style.transform = 'scale(1.1)';
-            button.style.boxShadow = '0 6px 25px rgba(0,0,0,0.4)';
-        });
-        
-        button.addEventListener('mouseleave', function() {
-            button.style.transform = 'scale(1)';
-            button.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
-        });
-        
-        // Click handler
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleWidget();
-        });
-        
-        return button;
-    }
+    let isExpanded = false;
+    let observer = null;
     
     // Create widget container
     function createWidgetContainer() {
@@ -84,131 +37,155 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 380px;
-            height: 520px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            z-index: 9998;
-            transform: scale(0);
-            opacity: 0;
-            pointer-events: none;
-            transform-origin: bottom right;
-            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            overflow: hidden;
-        `;
-        
-        // Add close button
-        const closeButton = document.createElement('div');
-        closeButton.style.cssText = `
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            width: 30px;
-            height: 30px;
-            background: rgba(0,0,0,0.1);
+            z-index: 9999;
+            transition: all 0.3s ease;
             border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            transition: all 0.2s ease;
-            color: #666;
-            font-size: 18px;
-            font-weight: bold;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         `;
-        closeButton.innerHTML = '×';
-        
-        closeButton.addEventListener('mouseenter', function() {
-            closeButton.style.background = 'rgba(0,0,0,0.2)';
-            closeButton.style.color = '#333';
-        });
-        
-        closeButton.addEventListener('mouseleave', function() {
-            closeButton.style.background = 'rgba(0,0,0,0.1)';
-            closeButton.style.color = '#666';
-        });
-        
-        closeButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            closeWidget();
-        });
-        
-        container.appendChild(closeButton);
-        
-        // Add loading indicator
-        const loadingDiv = document.createElement('div');
-        loadingDiv.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #666;
-            font-family: Arial, sans-serif;
-            font-size: 16px;
-            text-align: center;
-        `;
-        loadingDiv.innerHTML = `
-            <div style="margin-bottom: 10px;">🤖</div>
-            <div>Loading AI Assistant...</div>
-        `;
-        container.appendChild(loadingDiv);
         
         return container;
     }
     
-    // Load ElevenLabs widget
-    function loadElevenLabsWidget() {
-        if (elevenLabsWidget) return;
-        
-        // Load ElevenLabs script if not already loaded
-        if (!window.customElements || !window.customElements.get('elevenlabs-convai')) {
+    // Load ElevenLabs script
+    function loadElevenLabsScript() {
+        return new Promise((resolve, reject) => {
+            if (window.customElements && window.customElements.get('elevenlabs-convai')) {
+                resolve();
+                return;
+            }
+            
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
             script.async = true;
-            script.onload = function() {
-                setTimeout(initializeElevenLabsWidget, 500);
+            script.onload = () => {
+                // Wait for custom element to be registered
+                const checkRegistration = setInterval(() => {
+                    if (window.customElements && window.customElements.get('elevenlabs-convai')) {
+                        clearInterval(checkRegistration);
+                        resolve();
+                    }
+                }, 100);
+                
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    clearInterval(checkRegistration);
+                    resolve(); // Resolve anyway
+                }, 10000);
             };
+            script.onerror = reject;
             document.head.appendChild(script);
-        } else {
-            initializeElevenLabsWidget();
-        }
+        });
     }
     
-    // Initialize ElevenLabs widget
-    function initializeElevenLabsWidget() {
+    // Create ElevenLabs widget
+    function createElevenLabsWidget() {
         elevenLabsWidget = document.createElement('elevenlabs-convai');
         elevenLabsWidget.setAttribute('agent-id', agentId);
         
-        // Style the widget to fill container
+        // Initial small size styling
         elevenLabsWidget.style.cssText = `
-            width: 100%;
-            height: 100%;
-            border: none;
-            border-radius: 20px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            transform-origin: bottom right;
         `;
         
-        // Remove loading indicator
-        const loadingDiv = widgetContainer.querySelector('div[style*="Loading AI Assistant"]');
-        if (loadingDiv) {
-            loadingDiv.remove();
+        return elevenLabsWidget;
+    }
+    
+    // Monitor widget state changes
+    function monitorWidgetState() {
+        if (!elevenLabsWidget) return;
+        
+        const container = document.getElementById('ai-widget-container');
+        
+        // Check widget dimensions and content
+        function checkWidgetExpansion() {
+            try {
+                const rect = elevenLabsWidget.getBoundingClientRect();
+                const shouldBeExpanded = rect.width > 100 || rect.height > 100;
+                
+                // Check for conversation elements in shadow DOM
+                let hasConversationElements = false;
+                if (elevenLabsWidget.shadowRoot) {
+                    try {
+                        const conversationElements = elevenLabsWidget.shadowRoot.querySelectorAll(
+                            '[class*="conversation"], [class*="chat"], [class*="messages"], [class*="expanded"], [class*="open"]'
+                        );
+                        hasConversationElements = conversationElements.length > 0;
+                    } catch (e) {
+                        // Ignore shadow DOM access errors
+                    }
+                }
+                
+                const newExpandedState = shouldBeExpanded || hasConversationElements;
+                
+                if (newExpandedState !== isExpanded) {
+                    isExpanded = newExpandedState;
+                    updateWidgetSize();
+                }
+            } catch (e) {
+                // Ignore errors
+            }
         }
         
-        widgetContainer.appendChild(elevenLabsWidget);
+        // Check periodically
+        setInterval(checkWidgetExpansion, 300);
         
-        // Hide branding after widget loads
-        setTimeout(hideBranding, 1000);
-        setTimeout(hideBranding, 2000);
-        setTimeout(hideBranding, 3000);
+        // Also check on DOM changes
+        observer = new MutationObserver(() => {
+            setTimeout(checkWidgetExpansion, 100);
+        });
         
-        // Set up branding monitor
-        const brandingObserver = new MutationObserver(hideBranding);
-        brandingObserver.observe(widgetContainer, {
+        observer.observe(document.body, {
             childList: true,
             subtree: true
         });
+        
+        // Check on clicks
+        document.addEventListener('click', () => {
+            setTimeout(checkWidgetExpansion, 200);
+        });
+    }
+    
+    // Update widget size based on state
+    function updateWidgetSize() {
+        if (!elevenLabsWidget) return;
+        
+        const container = document.getElementById('ai-widget-container');
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isExpanded) {
+            // Expanded state
+            if (isMobile) {
+                elevenLabsWidget.style.width = 'calc(100vw - 40px)';
+                elevenLabsWidget.style.height = '70vh';
+                elevenLabsWidget.style.maxWidth = '380px';
+                container.style.bottom = '10px';
+                container.style.right = '10px';
+            } else {
+                elevenLabsWidget.style.width = '380px';
+                elevenLabsWidget.style.height = '520px';
+                container.style.bottom = '20px';
+                container.style.right = '20px';
+            }
+            
+            elevenLabsWidget.style.borderRadius = '20px';
+            container.style.borderRadius = '20px';
+            container.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
+            
+        } else {
+            // Collapsed state
+            elevenLabsWidget.style.width = '80px';
+            elevenLabsWidget.style.height = '80px';
+            elevenLabsWidget.style.borderRadius = '50%';
+            container.style.borderRadius = '50%';
+            container.style.bottom = '20px';
+            container.style.right = '20px';
+            container.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+        }
     }
     
     // Hide ElevenLabs branding
@@ -216,6 +193,28 @@
         if (!elevenLabsWidget) return;
         
         // Hide branding in main document
+        const brandingSelectors = [
+            '[data-testid*="branding"]',
+            '[data-testid*="powered"]',
+            '[class*="branding"]',
+            '[class*="powered"]',
+            '[class*="elevenlabs"]',
+            '[aria-label*="ElevenLabs"]',
+            '[aria-label*="Powered by"]',
+            '[title*="ElevenLabs"]',
+            '[title*="Powered by"]',
+            'a[href*="elevenlabs"]',
+            'a[href*="conversational-ai"]'
+        ];
+        
+        brandingSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+                el.style.display = 'none';
+            });
+        });
+        
+        // Hide text-based branding
         const allElements = document.querySelectorAll('*');
         allElements.forEach(el => {
             if (el.textContent && (
@@ -248,119 +247,61 @@
         }
     }
     
-    // Open widget
-    function openWidget() {
-        if (isOpen) return;
-        
-        isOpen = true;
-        const button = document.getElementById('ai-widget-button');
-        
-        // Hide button
-        button.style.transform = 'scale(0)';
-        button.style.opacity = '0';
-        button.style.pointerEvents = 'none';
-        
-        // Show container
-        widgetContainer.style.transform = 'scale(1)';
-        widgetContainer.style.opacity = '1';
-        widgetContainer.style.pointerEvents = 'auto';
-        
-        // Mobile responsive
-        if (window.innerWidth <= 768) {
-            widgetContainer.style.width = 'calc(100vw - 20px)';
-            widgetContainer.style.height = '70vh';
-            widgetContainer.style.maxWidth = '380px';
-            widgetContainer.style.bottom = '10px';
-            widgetContainer.style.right = '10px';
+    // Handle window resize
+    function handleResize() {
+        if (isExpanded) {
+            updateWidgetSize();
         }
-        
-        // Load widget if not already loaded
-        if (!elevenLabsWidget) {
-            loadElevenLabsWidget();
-        }
-    }
-    
-    // Close widget
-    function closeWidget() {
-        if (!isOpen) return;
-        
-        isOpen = false;
-        const button = document.getElementById('ai-widget-button');
-        
-        // Show button
-        button.style.transform = 'scale(1)';
-        button.style.opacity = '1';
-        button.style.pointerEvents = 'auto';
-        
-        // Hide container
-        widgetContainer.style.transform = 'scale(0)';
-        widgetContainer.style.opacity = '0';
-        widgetContainer.style.pointerEvents = 'none';
-        
-        // Reset mobile styles
-        widgetContainer.style.width = '380px';
-        widgetContainer.style.height = '520px';
-        widgetContainer.style.bottom = '20px';
-        widgetContainer.style.right = '20px';
-    }
-    
-    // Toggle widget
-    function toggleWidget() {
-        if (isOpen) {
-            closeWidget();
-        } else {
-            openWidget();
-        }
-    }
-    
-    // Event listeners
-    function setupEventListeners() {
-        // Close on escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && isOpen) {
-                closeWidget();
-            }
-        });
-        
-        // Close on outside click
-        document.addEventListener('click', function(e) {
-            if (isOpen && 
-                !widgetContainer.contains(e.target) && 
-                !document.getElementById('ai-widget-button').contains(e.target)) {
-                closeWidget();
-            }
-        });
-        
-        // Handle window resize
-        window.addEventListener('resize', function() {
-            if (isOpen) {
-                openWidget(); // Reapply responsive styles
-            }
-        });
     }
     
     // Initialize widget
-    function init() {
-        // Create elements
-        const button = createFloatingButton();
-        widgetContainer = createWidgetContainer();
-        
-        // Add to DOM
-        document.body.appendChild(button);
-        document.body.appendChild(widgetContainer);
-        
-        // Setup event listeners
-        setupEventListeners();
-        
-        // Expose global API
-        window.aiWidget = {
-            open: openWidget,
-            close: closeWidget,
-            toggle: toggleWidget,
-            isOpen: () => isOpen
-        };
-        
-        console.log('AI Widget loaded successfully!');
+    async function init() {
+        try {
+            // Load ElevenLabs script
+            await loadElevenLabsScript();
+            
+            // Create container
+            const container = createWidgetContainer();
+            document.body.appendChild(container);
+            
+            // Create widget
+            const widget = createElevenLabsWidget();
+            container.appendChild(widget);
+            
+            // Start monitoring
+            setTimeout(() => {
+                monitorWidgetState();
+                updateWidgetSize();
+            }, 1000);
+            
+            // Hide branding periodically
+            setTimeout(hideBranding, 1000);
+            setTimeout(hideBranding, 2000);
+            setTimeout(hideBranding, 3000);
+            setTimeout(hideBranding, 5000);
+            
+            // Set up branding removal observer
+            const brandingObserver = new MutationObserver(hideBranding);
+            brandingObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            
+            // Handle resize
+            window.addEventListener('resize', handleResize);
+            
+            // Expose API
+            window.aiWidget = {
+                isExpanded: () => isExpanded,
+                forceUpdate: updateWidgetSize,
+                hideBranding: hideBranding
+            };
+            
+            console.log('Direct ElevenLabs Widget loaded successfully!');
+            
+        } catch (error) {
+            console.error('Failed to load AI Widget:', error);
+        }
     }
     
     // Wait for DOM
