@@ -1,17 +1,14 @@
 (function() {
-    console.log('🚀 Loading AI Widget V2 - Mobile Hide Version');
-    
     // Extract agent ID from script tag
     function getAgentIdFromScript() {
         const scripts = document.getElementsByTagName('script');
         for (let script of scripts) {
-            if (script.src && script.src.includes('v2/widget-loader.js')) {
+            if (script.src && (script.src.includes('widget-loader-v2.js') || script.src.includes('widget-loader.js'))) {
                 const agentId = script.getAttribute('data-agent-id');
                 if (agentId) return agentId;
             }
         }
         
-        // Fallback: look for the current script
         const currentScript = document.currentScript;
         if (currentScript) {
             const agentId = currentScript.getAttribute('data-agent-id');
@@ -21,227 +18,187 @@
         return null;
     }
 
-    // Get agent ID from current script
     const agentId = getAgentIdFromScript();
     
     if (!agentId) {
-        console.error('AI Widget V2: No agent ID provided. Please add data-agent-id attribute to the script tag.');
+        console.error('AI Widget V2.0: No agent ID provided.');
         return;
     }
     
-    // Build widget URL with agent parameter (V2)
-    const widgetUrl = 'https://sam190291.github.io/omnihive.ai/v2/?agent=' + encodeURIComponent(agentId);
-
-    // Create widget container
-    const widgetContainer = document.createElement('div');
-    widgetContainer.id = 'ai-widget-v2-container';
-    widgetContainer.style.cssText = 'position: fixed; bottom: 20px; right: 20px; z-index: 9999; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);';
-
-    // Create iframe
-    const iframe = document.createElement('iframe');
-    iframe.src = widgetUrl;
-    iframe.style.cssText = 'width: 380px; height: 520px; border: none; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);';
-    iframe.frameBorder = '0';
-    iframe.setAttribute('allow', 'microphone');
-
-    // Create mobile toggle button (V2 - Enhanced)
-    const toggleButton = document.createElement('button');
-    toggleButton.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
-        </svg>
-    `;
-    toggleButton.style.cssText = `
-        display: none;
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        border: none;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        cursor: pointer;
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-        z-index: 10000;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        align-items: center;
-        justify-content: center;
-    `;
-
-    // Create close button for mobile (V2 - Enhanced)
-    const closeButton = document.createElement('button');
-    closeButton.innerHTML = `
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-        </svg>
-    `;
-    closeButton.style.cssText = `
-        display: none;
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: none;
-        background: rgba(0,0,0,0.7);
-        color: white;
-        cursor: pointer;
-        z-index: 10001;
-        transition: all 0.2s ease;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(10px);
-    `;
-
-    // Widget state management
+    let iframe = null;
+    let widgetState = 'loading';
     let isMobile = false;
-    let isWidgetVisible = true;
-    let inactivityTimer;
-
-    // Check if mobile
-    function checkMobile() {
-        return window.innerWidth <= 768;
-    }
-
-    // Update mobile state (V2 - Enhanced)
-    function updateMobileState() {
-        isMobile = checkMobile();
-        
-        if (isMobile) {
-            // V2 Mobile layout - Enhanced
-            iframe.style.width = 'calc(100vw - 20px)';
-            iframe.style.height = '75vh';
-            iframe.style.maxWidth = '380px';
-            iframe.style.maxHeight = '600px';
-            widgetContainer.style.bottom = '10px';
-            widgetContainer.style.right = '10px';
-            widgetContainer.style.left = '10px';
-            widgetContainer.style.width = 'auto';
-            
-            // Show mobile controls
-            toggleButton.style.display = isWidgetVisible ? 'none' : 'flex';
-            closeButton.style.display = isWidgetVisible ? 'flex' : 'none';
-            
-        } else {
-            // Desktop layout
-            iframe.style.width = '380px';
-            iframe.style.height = '520px';
-            iframe.style.maxWidth = 'none';
-            iframe.style.maxHeight = 'none';
-            widgetContainer.style.bottom = '20px';
-            widgetContainer.style.right = '20px';
-            widgetContainer.style.left = 'auto';
-            widgetContainer.style.width = 'auto';
-            
-            // Hide mobile controls on desktop
-            toggleButton.style.display = 'none';
-            closeButton.style.display = 'none';
-            
-            // Always show widget on desktop
-            if (!isWidgetVisible) {
-                showWidget();
-            }
-        }
-    }
-
-    // Show widget (V2)
-    function showWidget() {
-        isWidgetVisible = true;
-        widgetContainer.style.display = 'block';
-        toggleButton.style.display = 'none';
-        if (isMobile) {
-            closeButton.style.display = 'flex';
-            resetInactivityTimer();
-        }
-    }
-
-    // Hide widget (V2)
-    function hideWidget() {
-        isWidgetVisible = false;
-        widgetContainer.style.display = 'none';
-        closeButton.style.display = 'none';
-        clearTimeout(inactivityTimer);
-        if (isMobile) {
-            toggleButton.style.display = 'flex';
-        }
-    }
-
-    // V2: Auto-hide after inactivity (mobile only)
-    function resetInactivityTimer() {
-        if (isMobile && isWidgetVisible) {
-            clearTimeout(inactivityTimer);
-            inactivityTimer = setTimeout(() => {
-                if (isMobile && isWidgetVisible) {
-                    hideWidget();
-                }
-            }, 45000); // 45 seconds for V2
-        }
-    }
-
-    // Event listeners
-    toggleButton.addEventListener('click', function() {
-        showWidget();
-    });
-
-    closeButton.addEventListener('click', function() {
-        hideWidget();
-    });
-
-    // V2: Enhanced hover effects
-    toggleButton.addEventListener('mouseenter', function() {
-        this.style.transform = 'scale(1.1)';
-        this.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.6)';
-    });
-
-    toggleButton.addEventListener('mouseleave', function() {
-        this.style.transform = 'scale(1)';
-        this.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
-    });
-
-    closeButton.addEventListener('mouseenter', function() {
-        this.style.background = 'rgba(220, 38, 38, 0.9)';
-        this.style.transform = 'scale(1.1)';
-    });
-
-    closeButton.addEventListener('mouseleave', function() {
-        this.style.background = 'rgba(0,0,0,0.7)';
-        this.style.transform = 'scale(1)';
-    });
-
-    // Assemble widget
-    widgetContainer.appendChild(iframe);
-    widgetContainer.appendChild(closeButton);
-
-    // Apply responsive design
-    updateMobileState();
-    window.addEventListener('resize', updateMobileState);
+    let isHidden = false;
     
-    // V2: Track user interaction for auto-hide
-    function setupInactivityTracking() {
-        if (isMobile) {
-            document.addEventListener('click', resetInactivityTimer);
-            document.addEventListener('scroll', resetInactivityTimer);
-            document.addEventListener('touchstart', resetInactivityTimer);
-            document.addEventListener('keypress', resetInactivityTimer);
-            window.addEventListener('focus', resetInactivityTimer);
+    // Check if device is mobile
+    function checkMobile() {
+        isMobile = window.innerWidth <= 768;
+        return isMobile;
+    }
+    
+    // Create iframe
+    function createWidget() {
+        iframe = document.createElement('iframe');
+        const widgetUrl = `https://sam190291.github.io/omnihive.ai/v2/?agent=${encodeURIComponent(agentId)}`;
+        iframe.src = widgetUrl;
+        iframe.frameBorder = '0';
+        iframe.setAttribute('allow', 'microphone');
+        iframe.setAttribute('title', 'AI Assistant V2.0');
+        
+        // Initial styling
+        iframe.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            height: 520px;
+            z-index: 9999;
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        `;
+        
+        // Mobile responsive
+        if (checkMobile()) {
+            iframe.style.width = 'calc(100vw - 30px)';
+            iframe.style.height = '70vh';
+            iframe.style.maxWidth = '380px';
+            iframe.style.bottom = '15px';
+            iframe.style.right = '15px';
+        }
+        
+        return iframe;
+    }
+    
+    // Update iframe based on widget state
+    function updateWidgetDisplay(state, mobile, hidden) {
+        if (!iframe) return;
+        
+        widgetState = state;
+        isMobile = mobile;
+        isHidden = hidden;
+        
+        if (state === 'loading') {
+            // Show small loading indicator
+            iframe.style.width = '60px';
+            iframe.style.height = '60px';
+            iframe.style.borderRadius = '50%';
+        } else if (hidden) {
+            // Widget is hidden, show small button
+            iframe.style.width = mobile ? '50px' : '60px';
+            iframe.style.height = mobile ? '50px' : '60px';
+            iframe.style.borderRadius = '50%';
+            iframe.style.bottom = mobile ? '15px' : '20px';
+            iframe.style.right = mobile ? '15px' : '20px';
+        } else {
+            // Widget is open, show full size
+            if (mobile) {
+                iframe.style.width = 'calc(100vw - 30px)';
+                iframe.style.height = '70vh';
+                iframe.style.maxWidth = '380px';
+                iframe.style.bottom = '15px';
+                iframe.style.right = '15px';
+            } else {
+                iframe.style.width = '380px';
+                iframe.style.height = '520px';
+                iframe.style.bottom = '20px';
+                iframe.style.right = '20px';
+            }
+            iframe.style.borderRadius = '20px';
         }
     }
-
-    // Wait for DOM to be ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            document.body.appendChild(widgetContainer);
-            document.body.appendChild(toggleButton);
-            setupInactivityTracking();
+    
+    // Listen for messages from widget
+    function setupMessageListener() {
+        window.addEventListener('message', function(event) {
+            // Verify origin for security
+            if (event.origin !== 'https://sam190291.github.io') return;
+            
+            const data = event.data;
+            
+            if (data.type === 'widget-state-v2') {
+                updateWidgetDisplay(data.state, data.isMobile, data.isHidden);
+            }
         });
-    } else {
-        document.body.appendChild(widgetContainer);
-        document.body.appendChild(toggleButton);
-        setupInactivityTracking();
     }
-
-    console.log('✅ AI Widget V2 Loaded Successfully');
+    
+    // Handle window resize
+    function handleResize() {
+        const wasMobile = isMobile;
+        checkMobile();
+        
+        if (wasMobile !== isMobile) {
+            updateWidgetDisplay(widgetState, isMobile, isHidden);
+        }
+    }
+    
+    // Add status indicator (optional)
+    function addStatusIndicator() {
+        const status = document.createElement('div');
+        status.id = 'ai-widget-v2-status';
+        status.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+            display: none;
+        `;
+        
+        function updateStatus() {
+            const stateText = isHidden ? 'Hidden' : 'Open';
+            const deviceText = isMobile ? 'Mobile' : 'Desktop';
+            status.textContent = `AI Widget V2.0: ${stateText} (${deviceText})`;
+        }
+        
+        // Show status for development/testing
+        if (window.location.hostname === 'localhost' || 
+            window.location.hostname === '127.0.0.1' ||
+            window.location.search.includes('debug=true')) {
+            status.style.display = 'block';
+            setInterval(updateStatus, 1000);
+        }
+        
+        document.body.appendChild(status);
+    }
+    
+    // Initialize widget
+    function init() {
+        checkMobile();
+        
+        // Create and add widget
+        const widget = createWidget();
+        document.body.appendChild(widget);
+        
+        // Setup message listener
+        setupMessageListener();
+        
+        // Handle resize
+        window.addEventListener('resize', handleResize);
+        
+        // Add status indicator (for debugging)
+        addStatusIndicator();
+        
+        // Expose API
+        window.aiWidgetV2 = {
+            getState: () => ({ state: widgetState, isMobile, isHidden }),
+            resize: handleResize
+        };
+        
+        console.log('AI Widget V2.0 Loader initialized successfully!');
+    }
+    
+    // Wait for DOM
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
