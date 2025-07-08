@@ -143,17 +143,20 @@
             const agentId = getAgentId();
             if (!agentId) return;
             
+            // Re-check mobile status at initialization
+            isMobile = window.innerWidth <= 768;
+            
             // Create widget element
             const widgetElement = document.createElement('elevenlabs-convai');
             widgetElement.setAttribute('agent-id', agentId);
             
-            // Set variant based on device type
+            // Only set variant for mobile - let desktop use default
             if (isMobile) {
                 widgetElement.setAttribute('variant', 'compact');
-                console.log('Mobile detected: Using compact variant');
+                console.log(`Mobile detected (${window.innerWidth}px): Using compact variant`);
             } else {
-                widgetElement.setAttribute('variant', 'expanded');
-                console.log('Desktop detected: Using expanded variant');
+                // Don't set variant attribute - let it use default behavior
+                console.log(`Desktop detected (${window.innerWidth}px): Using default variant`);
             }
             
             // Replace loading with widget
@@ -190,10 +193,10 @@
                 if (widget) {
                     if (isMobile) {
                         widget.setAttribute('variant', 'compact');
-                        console.log('Switched to mobile: Using compact variant');
+                        console.log(`Switched to mobile (${window.innerWidth}px): Using compact variant`);
                     } else {
-                        widget.setAttribute('variant', 'expanded');
-                        console.log('Switched to desktop: Using expanded variant');
+                        widget.removeAttribute('variant');
+                        console.log(`Switched to desktop (${window.innerWidth}px): Using default variant`);
                     }
                 }
             }
