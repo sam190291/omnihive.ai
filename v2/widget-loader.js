@@ -1,9 +1,13 @@
 (function() {
+    // Configuration
+    const MOBILE_BREAKPOINT = 768;
+    const AUTO_HIDE_DELAY = 5000; // 5 seconds
+    
     // Extract agent ID from script tag
-    function getAgentIdFromScript() {
+    function getAgentId() {
         const scripts = document.getElementsByTagName('script');
         for (let script of scripts) {
-            if (script.src && (script.src.includes('widget-loader-v2.js') || script.src.includes('widget-loader.js'))) {
+            if (script.src && script.src.includes('widget-loader.js')) {
                 const agentId = script.getAttribute('data-agent-id');
                 if (agentId) return agentId;
             }
@@ -18,110 +22,292 @@
         return null;
     }
 
-    const agentId = getAgentIdFromScript();
+    const agentId = getAgentId();
     
     if (!agentId) {
-        console.error('AI Widget V2.0: No agent ID provided.');
+        console.error('AI Widget: No agent ID provided.');
         return;
     }
     
-    let iframe = null;
-    let widgetState = 'loading';
+    // State management
+    let widgetContainer = null;
+    let chatButton = null;
+    let elevenLabsWidget = null;
+    let isWidgetVisible = false;
     let isMobile = false;
-    let isHidden = false;
+    let autoHideTimer = null;
+    let isLoading = true;
     
     // Check if device is mobile
     function checkMobile() {
-        isMobile = window.innerWidth <= 768;
+        isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
         return isMobile;
     }
     
-    // Create iframe
-    function createWidget() {
-        iframe = document.createElement('iframe');
-        const widgetUrl = `https://sam190291.github.io/omnihive.ai/v2/?agent=${encodeURIComponent(agentId)}`;
-        iframe.src = widgetUrl;
-        iframe.frameBorder = '0';
-        iframe.setAttribute('allow', 'microphone');
-        iframe.setAttribute('title', 'AI Assistant V2.0');
-        
-        // Initial styling
-        iframe.style.cssText = `
+    // Create chat button
+    function createChatButton() {
+        chatButton = document.createElement('button');
+        chatButton.innerHTML = '💬';
+        chatButton.setAttribute('aria-label', 'Open AI Chat');
+        chatButton.style.cssText = `
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 380px;
-            height: 520px;
-            z-index: 9999;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
             border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+            user-select: none;
+        `;
+        
+        // Mobile specific styles
+        if (isMobile) {
+            chatButton.style.width = '50px';
+            chatButton.style.height = '50px';
+            chatButton.style.fontSize = '20px';
+            chatButton.style.bottom = '15px';
+            chatButton.style.right = '15px';
+        }
+        
+        // Hover effects
+        chatButton.addEventListener('mouseenter', () => {
+            chatButton.style.transform = 'scale(1.1)';
+            chatButton.style.boxShadow = '0 6px 25px rgba(0,0,0,0.4)';
+        });
+        
+        chatButton.addEventListener('mouseleave', () => {
+            chatButton.style.transform = 'scale(1)';
+            chatButton.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+        });
+        
+        // Click handler
+        chatButton.addEventListener('click', showWidget);
+        
+        return chatButton;
+    }
+    
+    // Create widget container
+    function createWidgetContainer() {
+        widgetContainer = document.createElement('div');
+        widgetContainer.id = 'ai-widget-container';
+        widgetContainer.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9998;
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             transition: all 0.3s ease;
             overflow: hidden;
+            background: white;
         `;
         
-        // Mobile responsive
-        if (checkMobile()) {
-            iframe.style.width = 'calc(100vw - 30px)';
-            iframe.style.height = '70vh';
-            iframe.style.maxWidth = '380px';
-            iframe.style.bottom = '15px';
-            iframe.style.right = '15px';
-        }
+        // Set dimensions based on device
+        updateWidgetSize();
         
-        return iframe;
+        return widgetContainer;
     }
     
-    // Update iframe based on widget state
-    function updateWidgetDisplay(state, mobile, hidden) {
-        if (!iframe) return;
+    // Create ElevenLabs widget
+    function createElevenLabsWidget() {
+        elevenLabsWidget = document.createElement('elevenlabs-convai');
+        elevenLabsWidget.setAttribute('agent-id', agentId);
         
-        widgetState = state;
-        isMobile = mobile;
-        isHidden = hidden;
+        // Hide branding styles
+        elevenLabsWidget.style.cssText = `
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+        `;
         
-        if (state === 'loading') {
-            // Show small loading indicator
-            iframe.style.width = '60px';
-            iframe.style.height = '60px';
-            iframe.style.borderRadius = '50%';
-        } else if (hidden) {
-            // Widget is hidden, show small button
-            iframe.style.width = mobile ? '50px' : '60px';
-            iframe.style.height = mobile ? '50px' : '60px';
-            iframe.style.borderRadius = '50%';
-            iframe.style.bottom = mobile ? '15px' : '20px';
-            iframe.style.right = mobile ? '15px' : '20px';
+        // Remove branding when widget loads
+        elevenLabsWidget.addEventListener('load', hideBranding);
+        
+        return elevenLabsWidget;
+    }
+    
+    // Update widget size based on device
+    function updateWidgetSize() {
+        if (!widgetContainer) return;
+        
+        if (isMobile) {
+            widgetContainer.style.width = 'calc(100vw - 30px)';
+            widgetContainer.style.height = '70vh';
+            widgetContainer.style.maxWidth = '380px';
+            widgetContainer.style.bottom = '15px';
+            widgetContainer.style.right = '15px';
         } else {
-            // Widget is open, show full size
-            if (mobile) {
-                iframe.style.width = 'calc(100vw - 30px)';
-                iframe.style.height = '70vh';
-                iframe.style.maxWidth = '380px';
-                iframe.style.bottom = '15px';
-                iframe.style.right = '15px';
-            } else {
-                iframe.style.width = '380px';
-                iframe.style.height = '520px';
-                iframe.style.bottom = '20px';
-                iframe.style.right = '20px';
-            }
-            iframe.style.borderRadius = '20px';
+            widgetContainer.style.width = '380px';
+            widgetContainer.style.height = '520px';
+            widgetContainer.style.bottom = '20px';
+            widgetContainer.style.right = '20px';
         }
     }
     
-    // Listen for messages from widget
-    function setupMessageListener() {
-        window.addEventListener('message', function(event) {
-            // Verify origin for security
-            if (event.origin !== 'https://sam190291.github.io') return;
-            
-            const data = event.data;
-            
-            if (data.type === 'widget-state-v2') {
-                updateWidgetDisplay(data.state, data.isMobile, data.isHidden);
+    // Show widget
+    function showWidget() {
+        if (!widgetContainer) return;
+        
+        widgetContainer.style.display = 'block';
+        chatButton.style.display = 'none';
+        isWidgetVisible = true;
+        
+        // Clear any existing timer
+        clearTimeout(autoHideTimer);
+        
+        // Auto-hide on mobile
+        if (isMobile) {
+            autoHideTimer = setTimeout(() => {
+                hideWidget();
+            }, AUTO_HIDE_DELAY);
+        }
+        
+        // Remove branding after showing
+        setTimeout(hideBranding, 500);
+        
+        console.log('AI Widget: Widget shown');
+    }
+    
+    // Hide widget
+    function hideWidget() {
+        if (!widgetContainer) return;
+        
+        widgetContainer.style.display = 'none';
+        chatButton.style.display = 'flex';
+        isWidgetVisible = false;
+        
+        // Add pulse animation to button
+        chatButton.style.animation = 'pulse 2s infinite';
+        
+        // Clear timer
+        clearTimeout(autoHideTimer);
+        
+        console.log('AI Widget: Widget hidden');
+    }
+    
+    // Hide branding elements
+    function hideBranding() {
+        // Hide branding in main document
+        const brandingSelectors = [
+            '[data-testid*="branding"]',
+            '[data-testid*="powered"]',
+            '[class*="branding"]',
+            '[class*="powered"]',
+            '[class*="elevenlabs"]',
+            '[aria-label*="ElevenLabs"]',
+            '[aria-label*="Powered by"]',
+            '[title*="ElevenLabs"]',
+            '[title*="Powered by"]',
+            'a[href*="elevenlabs"]',
+            'a[href*="conversational-ai"]',
+            '.elevenlabs-branding',
+            '.powered-by-elevenlabs',
+            '.branding-text',
+            '.footer-branding',
+            '.widget-branding',
+            '.convai-branding'
+        ];
+        
+        brandingSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+                el.style.display = 'none';
+                el.style.visibility = 'hidden';
+                el.style.opacity = '0';
+                el.style.height = '0';
+                el.style.width = '0';
+                el.style.overflow = 'hidden';
+            });
+        });
+        
+        // Hide text-based branding
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(el => {
+            if (el.textContent && (
+                el.textContent.toLowerCase().includes('powered by elevenlabs') ||
+                el.textContent.toLowerCase().includes('elevenlabs') ||
+                el.textContent.toLowerCase().includes('conversational ai') ||
+                el.textContent.toLowerCase().includes('powered by')
+            )) {
+                if (el.textContent.trim().length < 100 && !el.querySelector('elevenlabs-convai')) {
+                    el.style.display = 'none';
+                    el.style.visibility = 'hidden';
+                    el.style.opacity = '0';
+                    el.style.height = '0';
+                    el.style.width = '0';
+                    el.style.overflow = 'hidden';
+                }
             }
         });
+        
+        // Hide branding in shadow DOM
+        if (elevenLabsWidget && elevenLabsWidget.shadowRoot) {
+            try {
+                const shadowElements = elevenLabsWidget.shadowRoot.querySelectorAll('*');
+                shadowElements.forEach(el => {
+                    if (el.textContent && (
+                        el.textContent.toLowerCase().includes('powered by') ||
+                        el.textContent.toLowerCase().includes('elevenlabs')
+                    )) {
+                        el.style.display = 'none';
+                    }
+                });
+            } catch (e) {
+                // Ignore shadow DOM access errors
+            }
+        }
+    }
+    
+    // Add pulse animation CSS
+    function addPulseAnimation() {
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0% {
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                }
+                50% {
+                    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.6), 0 0 0 10px rgba(102, 126, 234, 0.1);
+                }
+                100% {
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                }
+            }
+            
+            /* Additional branding hiding styles */
+            elevenlabs-convai *[style*="font-size: 12px"],
+            elevenlabs-convai *[style*="font-size: 10px"],
+            elevenlabs-convai *[style*="font-size: 11px"] {
+                display: none !important;
+            }
+            
+            elevenlabs-convai footer,
+            elevenlabs-convai .footer,
+            elevenlabs-convai [class*="footer"],
+            elevenlabs-convai > div:last-child,
+            elevenlabs-convai [class*="bottom"],
+            elevenlabs-convai [class*="attribution"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                height: 0 !important;
+                width: 0 !important;
+                overflow: hidden !important;
+            }
+        `;
+        document.head.appendChild(style);
     }
     
     // Handle window resize
@@ -130,69 +316,147 @@
         checkMobile();
         
         if (wasMobile !== isMobile) {
-            updateWidgetDisplay(widgetState, isMobile, isHidden);
+            updateWidgetSize();
+            
+            // Update button size
+            if (isMobile) {
+                chatButton.style.width = '50px';
+                chatButton.style.height = '50px';
+                chatButton.style.fontSize = '20px';
+                chatButton.style.bottom = '15px';
+                chatButton.style.right = '15px';
+            } else {
+                chatButton.style.width = '60px';
+                chatButton.style.height = '60px';
+                chatButton.style.fontSize = '24px';
+                chatButton.style.bottom = '20px';
+                chatButton.style.right = '20px';
+            }
+            
+            // Restart auto-hide timer if widget is visible on mobile
+            if (isWidgetVisible && isMobile) {
+                clearTimeout(autoHideTimer);
+                autoHideTimer = setTimeout(hideWidget, AUTO_HIDE_DELAY);
+            }
         }
     }
     
-    // Add status indicator (optional)
-    function addStatusIndicator() {
-        const status = document.createElement('div');
-        status.id = 'ai-widget-v2-status';
-        status.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 12px;
-            z-index: 1000;
-            font-family: Arial, sans-serif;
-            display: none;
-        `;
+    // Handle clicks outside widget (mobile only)
+    function handleOutsideClick(event) {
+        if (!isMobile || !isWidgetVisible) return;
         
-        function updateStatus() {
-            const stateText = isHidden ? 'Hidden' : 'Open';
-            const deviceText = isMobile ? 'Mobile' : 'Desktop';
-            status.textContent = `AI Widget V2.0: ${stateText} (${deviceText})`;
+        if (!widgetContainer.contains(event.target) && !chatButton.contains(event.target)) {
+            hideWidget();
         }
-        
-        // Show status for development/testing
-        if (window.location.hostname === 'localhost' || 
-            window.location.hostname === '127.0.0.1' ||
-            window.location.search.includes('debug=true')) {
-            status.style.display = 'block';
-            setInterval(updateStatus, 1000);
+    }
+    
+    // Handle escape key
+    function handleEscapeKey(event) {
+        if (event.key === 'Escape' && isWidgetVisible) {
+            hideWidget();
         }
+    }
+    
+    // Reset auto-hide timer (for user interaction)
+    function resetAutoHideTimer() {
+        if (!isMobile || !isWidgetVisible) return;
         
-        document.body.appendChild(status);
+        clearTimeout(autoHideTimer);
+        autoHideTimer = setTimeout(hideWidget, AUTO_HIDE_DELAY);
+    }
+    
+    // Wait for ElevenLabs script to load
+    function waitForElevenLabs() {
+        return new Promise((resolve) => {
+            let checkCount = 0;
+            const checkInterval = setInterval(() => {
+                if (window.customElements && window.customElements.get('elevenlabs-convai')) {
+                    clearInterval(checkInterval);
+                    resolve();
+                } else if (checkCount++ > 50) { // 5 second timeout
+                    clearInterval(checkInterval);
+                    console.error('Failed to load ElevenLabs widget');
+                    resolve();
+                }
+            }, 100);
+        });
     }
     
     // Initialize widget
-    function init() {
+    async function init() {
         checkMobile();
         
-        // Create and add widget
-        const widget = createWidget();
-        document.body.appendChild(widget);
+        // Load ElevenLabs script if not already loaded
+        if (!document.querySelector('script[src*="elevenlabs"]')) {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
+            script.type = 'text/javascript';
+            script.async = true;
+            document.head.appendChild(script);
+        }
         
-        // Setup message listener
-        setupMessageListener();
+        // Wait for ElevenLabs to load
+        await waitForElevenLabs();
         
-        // Handle resize
+        // Add pulse animation CSS
+        addPulseAnimation();
+        
+        // Create elements
+        const container = createWidgetContainer();
+        const widget = createElevenLabsWidget();
+        const button = createChatButton();
+        
+        // Assemble widget
+        container.appendChild(widget);
+        
+        // Add to DOM
+        document.body.appendChild(container);
+        document.body.appendChild(button);
+        
+        // Event listeners
         window.addEventListener('resize', handleResize);
+        document.addEventListener('click', handleOutsideClick);
+        document.addEventListener('keydown', handleEscapeKey);
         
-        // Add status indicator (for debugging)
-        addStatusIndicator();
+        // Add interaction listeners to reset timer
+        container.addEventListener('click', resetAutoHideTimer);
+        container.addEventListener('touchstart', resetAutoHideTimer);
+        
+        // Initial state
+        isLoading = false;
+        
+        if (isMobile) {
+            // Show widget initially for 5 seconds, then auto-hide
+            showWidget();
+        } else {
+            // Show widget immediately on desktop
+            showWidget();
+        }
+        
+        // Start continuous branding cleanup
+        setInterval(hideBranding, 2000);
+        
+        // Monitor for dynamic content changes
+        const observer = new MutationObserver(() => {
+            setTimeout(hideBranding, 100);
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
         
         // Expose API
-        window.aiWidgetV2 = {
-            getState: () => ({ state: widgetState, isMobile, isHidden }),
-            resize: handleResize
+        window.aiWidget = {
+            show: showWidget,
+            hide: hideWidget,
+            toggle: () => isWidgetVisible ? hideWidget() : showWidget(),
+            isVisible: () => isWidgetVisible,
+            isMobile: () => isMobile,
+            isLoading: () => isLoading
         };
         
-        console.log('AI Widget V2.0 Loader initialized successfully!');
+        console.log('AI Widget: Direct mobile loader initialized successfully!');
     }
     
     // Wait for DOM
