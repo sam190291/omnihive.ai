@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Assistant V2.0</title>
+    <title>AI Voice Assistant</title>
     <style>
         /* Hide ALL Branding */
         [data-testid*="branding"],
@@ -55,7 +55,6 @@
             padding: 0;
             overflow: hidden;
             font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .loading {
@@ -65,7 +64,6 @@
             height: 100vh;
             color: #666;
             font-size: 16px;
-            color: white;
         }
 
         .error {
@@ -78,169 +76,42 @@
             text-align: center;
             padding: 20px;
         }
-        
-        /* Chat toggle button styles */
-        #ai-chat-toggle-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            border-radius: 50%;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            cursor: pointer;
-            z-index: 10000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-            color: white;
-            font-size: 24px;
-            user-select: none;
-            border: none;
-            outline: none;
-        }
-        
-        #ai-chat-toggle-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 25px rgba(0,0,0,0.4);
-        }
-        
-        #ai-chat-toggle-btn:active {
-            transform: scale(0.95);
-        }
-        
-        #ai-widget-container-v2 {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 9999;
-            transition: all 0.3s ease;
-        }
-        
-        /* Mobile optimizations */
+
+        /* Mobile-specific optimizations */
         @media (max-width: 768px) {
-            #ai-chat-toggle-btn {
-                width: 50px;
-                height: 50px;
-                font-size: 20px;
-                bottom: 15px;
-                right: 15px;
-            }
-            
-            #ai-widget-container-v2 {
-                bottom: 15px;
-                right: 15px;
+            elevenlabs-convai {
+                /* Let the compact variant handle mobile styling */
             }
         }
-        
-        /* Status indicator */
-        .status-indicator {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 10px;
-            font-size: 14px;
-            z-index: 1000;
-            font-family: Arial, sans-serif;
-        }
-        
-        /* Pulse animation for chat button */
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+
+        /* Desktop-specific optimizations */
+        @media (min-width: 769px) {
+            elevenlabs-convai {
+                /* Let the expanded variant handle desktop styling */
             }
-            50% {
-                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.6), 0 0 0 10px rgba(102, 126, 234, 0.1);
-            }
-            100% {
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            }
-        }
-        
-        #ai-chat-toggle-btn.pulse {
-            animation: pulse 2s infinite;
-        }
-        
-        /* Loading spinner */
-        .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 3px solid white;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="loading" id="loading">
-        <div class="spinner"></div>
-        Loading AI Assistant V2.0...
-    </div>
-    
-    <!-- Status Indicator -->
-    <div class="status-indicator" id="status">
-        Status: Initializing...
-    </div>
-    
-    <!-- Chat Toggle Button -->
-    <button id="ai-chat-toggle-btn" aria-label="Toggle AI Chat">
-        💬
-    </button>
-    
-    <!-- Widget Container -->
-    <div id="ai-widget-container-v2"></div>
+    <div class="loading" id="loading">Loading AI Assistant...</div>
     
     <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
 
     <script>
         // State management
-        let currentState = 'loading';
+        let currentState = 'closed';
         let isInFrame = window.parent !== window;
-        let elevenLabsWidget = null;
-        let chatToggleButton = null;
-        let widgetContainer = null;
-        let isWidgetHidden = false;
-        let isMobile = false;
-        let hideTimer = null;
-        let statusEl = document.getElementById('status');
-        let loadingEl = document.getElementById('loading');
-        
-        // Update status
-        function updateStatus(message) {
-            if (statusEl) {
-                statusEl.textContent = `Status: ${message}`;
-            }
-            console.log(`AI Widget V2.0: ${message}`);
-        }
+        let isMobile = window.innerWidth <= 768;
         
         // Send state to parent window
         function sendStateToParent(state) {
             if (isInFrame) {
                 window.parent.postMessage({
-                    type: 'widget-state-v2',
+                    type: 'widget-state',
                     state: state,
-                    isMobile: isMobile,
-                    isHidden: isWidgetHidden
+                    isMobile: isMobile
                 }, '*');
             }
-        }
-        
-        // Check if device is mobile
-        function checkMobile() {
-            isMobile = window.innerWidth <= 768;
-            return isMobile;
         }
         
         // Get agent ID from URL parameter
@@ -257,39 +128,38 @@
         }
 
         function showError(message) {
-            loadingEl.innerHTML = `
+            const loading = document.getElementById('loading');
+            loading.innerHTML = `
                 <div class="error">
                     <h3>Configuration Error</h3>
                     <p>${message}</p>
                     <small>Example: ?agent=agent_01jxjyk81cfqrs9zer2vsp4h7e</small>
                 </div>
             `;
-            updateStatus('Error - Invalid configuration');
         }
 
-        // Initialize widget with dynamic agent ID
+        // Initialize widget with dynamic agent ID and mobile-responsive variant
         function initializeWidget() {
             const agentId = getAgentId();
             if (!agentId) return;
             
-            updateStatus('Creating widget...');
-            
-            // Get elements
-            chatToggleButton = document.getElementById('ai-chat-toggle-btn');
-            widgetContainer = document.getElementById('ai-widget-container-v2');
-            
             // Create widget element
-            elevenLabsWidget = document.createElement('elevenlabs-convai');
-            elevenLabsWidget.setAttribute('agent-id', agentId);
+            const widgetElement = document.createElement('elevenlabs-convai');
+            widgetElement.setAttribute('agent-id', agentId);
             
-            // Add to container
-            widgetContainer.appendChild(elevenLabsWidget);
+            // Set variant based on device type
+            if (isMobile) {
+                widgetElement.setAttribute('variant', 'compact');
+                console.log('Mobile detected: Using compact variant');
+            } else {
+                widgetElement.setAttribute('variant', 'expanded');
+                console.log('Desktop detected: Using expanded variant');
+            }
             
-            // Hide loading
-            loadingEl.style.display = 'none';
-            
-            // Setup functionality
-            setupWidgetFunctionality();
+            // Replace loading with widget
+            const loading = document.getElementById('loading');
+            loading.style.display = 'none';
+            document.body.appendChild(widgetElement);
             
             // Start branding cleanup
             setTimeout(hideBranding, 500);
@@ -297,164 +167,39 @@
             setTimeout(hideBranding, 2000);
             setTimeout(hideBranding, 3000);
             setTimeout(hideBranding, 5000);
+            setTimeout(hideBranding, 8000);
+            setTimeout(hideBranding, 10000);
             
-            // Monitor and remove branding continuously
-            setInterval(hideBranding, 2000);
+            // Continuous branding removal
+            setInterval(hideBranding, 3000);
             
-            // Show widget initially
-            showWidget();
+            // Monitor widget state changes
+            setTimeout(monitorWidgetState, 1000);
             
-            // Auto-hide on mobile after 5 seconds
-            if (checkMobile()) {
-                setTimeout(() => {
-                    hideWidget();
-                    updateStatus('Widget auto-hidden on mobile');
-                }, 5000);
-            }
-            
-            updateStatus('Widget loaded successfully');
-        }
-        
-        // Setup widget functionality
-        function setupWidgetFunctionality() {
-            checkMobile();
-            
-            // Chat button click handler
-            chatToggleButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                toggleWidget();
-            });
-            
-            // Setup event listeners
-            setupEventListeners();
-            
-            // Monitor widget interactions
-            setTimeout(() => {
-                monitorWidgetInteractions();
-            }, 2000);
-        }
-        
-        // Show widget
-        function showWidget() {
-            if (widgetContainer && elevenLabsWidget) {
-                widgetContainer.style.display = 'block';
-                chatToggleButton.style.display = 'none';
-                chatToggleButton.classList.remove('pulse');
-                isWidgetHidden = false;
-                clearTimeout(hideTimer);
-                
-                sendStateToParent('open');
-                updateStatus(`Widget shown${isMobile ? ' (mobile)' : ' (desktop)'}`);
-                
-                // Auto-hide on mobile after 30 seconds if no interaction
-                if (checkMobile()) {
-                    resetAutoHideTimer();
-                }
-            }
-        }
-        
-        // Hide widget
-        function hideWidget() {
-            if (widgetContainer) {
-                widgetContainer.style.display = 'none';
-                chatToggleButton.style.display = 'flex';
-                chatToggleButton.classList.add('pulse');
-                isWidgetHidden = true;
-                clearTimeout(hideTimer);
-                
-                sendStateToParent('closed');
-                updateStatus(`Widget hidden${isMobile ? ' (mobile auto-hide)' : ''}`);
-            }
-        }
-        
-        // Toggle widget visibility
-        function toggleWidget() {
-            if (isWidgetHidden) {
-                showWidget();
-            } else {
-                hideWidget();
-            }
-        }
-        
-        // Reset auto-hide timer for mobile
-        function resetAutoHideTimer() {
-            if (!checkMobile()) return;
-            
-            clearTimeout(hideTimer);
-            hideTimer = setTimeout(() => {
-                if (!isWidgetHidden) {
-                    hideWidget();
-                }
-            }, 30000); // 30 seconds
-        }
-        
-        // Monitor widget interactions to reset auto-hide timer
-        function monitorWidgetInteractions() {
-            if (!elevenLabsWidget) return;
-            
-            // Monitor clicks on the widget
-            elevenLabsWidget.addEventListener('click', resetAutoHideTimer);
-            
-            // Monitor mouse movements over widget (for mobile touch)
-            elevenLabsWidget.addEventListener('touchstart', resetAutoHideTimer);
-            elevenLabsWidget.addEventListener('mouseenter', resetAutoHideTimer);
-            
-            // Monitor for any activity in shadow DOM if accessible
-            try {
-                if (elevenLabsWidget.shadowRoot) {
-                    elevenLabsWidget.shadowRoot.addEventListener('click', resetAutoHideTimer);
-                    elevenLabsWidget.shadowRoot.addEventListener('touchstart', resetAutoHideTimer);
-                }
-            } catch (e) {
-                // Ignore shadow DOM access errors
-            }
-        }
-        
-        // Setup event listeners
-        function setupEventListeners() {
             // Handle window resize
-            window.addEventListener('resize', function() {
-                const wasMobile = isMobile;
-                checkMobile();
-                
-                // If device changed from mobile to desktop or vice versa
-                if (wasMobile !== isMobile) {
-                    if (isMobile && !isWidgetHidden) {
-                        resetAutoHideTimer();
-                    } else if (!isMobile) {
-                        clearTimeout(hideTimer);
+            window.addEventListener('resize', handleResize);
+        }
+
+        // Handle window resize to update variant
+        function handleResize() {
+            const wasMobile = isMobile;
+            isMobile = window.innerWidth <= 768;
+            
+            if (wasMobile !== isMobile) {
+                const widget = document.querySelector('elevenlabs-convai');
+                if (widget) {
+                    if (isMobile) {
+                        widget.setAttribute('variant', 'compact');
+                        console.log('Switched to mobile: Using compact variant');
+                    } else {
+                        widget.setAttribute('variant', 'expanded');
+                        console.log('Switched to desktop: Using expanded variant');
                     }
-                    updateStatus(`Device changed to ${isMobile ? 'mobile' : 'desktop'}`);
                 }
-            });
-            
-            // Handle visibility change (user switches tabs)
-            document.addEventListener('visibilitychange', function() {
-                if (document.hidden && checkMobile() && !isWidgetHidden) {
-                    hideWidget();
-                }
-            });
-            
-            // Handle escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && !isWidgetHidden) {
-                    hideWidget();
-                }
-            });
-            
-            // Handle clicks outside widget on mobile
-            document.addEventListener('click', function(e) {
-                if (checkMobile() && !isWidgetHidden && 
-                    !widgetContainer.contains(e.target) && 
-                    !chatToggleButton.contains(e.target)) {
-                    hideWidget();
-                }
-            });
+            }
         }
 
         function hideBranding() {
-            // Hide text-based branding in main document
             const allElements = document.querySelectorAll('*');
             allElements.forEach(el => {
                 if (el.textContent && (
@@ -474,10 +219,10 @@
                 }
             });
 
-            // Hide branding in shadow DOM
-            if (elevenLabsWidget && elevenLabsWidget.shadowRoot) {
+            const widget = document.querySelector('elevenlabs-convai');
+            if (widget && widget.shadowRoot) {
                 try {
-                    const shadowElements = elevenLabsWidget.shadowRoot.querySelectorAll('*');
+                    const shadowElements = widget.shadowRoot.querySelectorAll('*');
                     shadowElements.forEach(el => {
                         if (el.textContent && (
                             el.textContent.toLowerCase().includes('powered by') ||
@@ -486,10 +231,55 @@
                             el.style.display = 'none';
                         }
                     });
+                } catch (e) {}
+            }
+        }
+
+        // Monitor widget state changes
+        function monitorWidgetState() {
+            const widget = document.querySelector('elevenlabs-convai');
+            if (!widget) {
+                setTimeout(monitorWidgetState, 500);
+                return;
+            }
+
+            // Check if widget is expanded or minimized
+            function checkWidgetState() {
+                try {
+                    // Look for indicators of expanded state
+                    const isExpanded = widget.shadowRoot && 
+                        widget.shadowRoot.querySelector('[class*="expanded"], [class*="open"], [class*="active"]');
+                    
+                    // Alternative: check for conversation/chat elements
+                    const hasConversation = widget.shadowRoot &&
+                        widget.shadowRoot.querySelector('[class*="conversation"], [class*="chat"], [class*="messages"]');
+                    
+                    // Alternative: check widget size
+                    const rect = widget.getBoundingClientRect();
+                    const isLargeSize = rect.width > 100 || rect.height > 100;
+                    
+                    const newState = (isExpanded || hasConversation || isLargeSize) ? 'open' : 'closed';
+                    
+                    if (newState !== currentState) {
+                        currentState = newState;
+                        sendStateToParent(currentState);
+                    }
                 } catch (e) {
-                    // Ignore shadow DOM access errors
+                    // Fallback: assume closed if can't detect
+                    if (currentState !== 'closed') {
+                        currentState = 'closed';
+                        sendStateToParent(currentState);
+                    }
                 }
             }
+
+            // Check state periodically
+            setInterval(checkWidgetState, 500);
+            
+            // Also check on clicks
+            document.addEventListener('click', () => {
+                setTimeout(checkWidgetState, 100);
+            });
         }
 
         // Monitor for dynamic content
@@ -513,24 +303,14 @@
                 });
             } else if (checkCount++ > 50) { // 5 second timeout
                 clearInterval(checkInterval);
-                showError('Failed to load ElevenLabs widget. Please refresh the page.');
+                initializeWidget(); // Try anyway
             }
         }, 100);
 
         // Initial state notification
         setTimeout(() => {
-            sendStateToParent('loading');
-            updateStatus('Loading ElevenLabs script...');
-        }, 500);
-        
-        // Expose API for parent window
-        window.aiWidgetV2 = {
-            show: showWidget,
-            hide: hideWidget,
-            toggle: toggleWidget,
-            isHidden: () => isWidgetHidden,
-            isMobile: () => isMobile
-        };
+            sendStateToParent('closed');
+        }, 1000);
     </script>
 </body>
 </html>
