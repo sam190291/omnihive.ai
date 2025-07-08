@@ -26,30 +26,53 @@
     }
     
     let elevenLabsWidget = null;
-    let isExpanded = false;
-    let observer = null;
     
-    // Create widget container
-    function createWidgetContainer() {
-        const container = document.createElement('div');
-        container.id = 'ai-widget-container';
-        container.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 9999;
-            transition: all 0.3s ease;
-            border-radius: 50%;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    // Hide branding styles
+    function addBrandingHideStyles() {
+        const style = document.createElement('style');
+        style.id = 'ai-widget-branding-hide';
+        style.textContent = `
+            /* Hide ALL Branding */
+            [data-testid*="branding"],
+            [data-testid*="powered"],
+            [class*="branding"],
+            [class*="powered"],
+            [class*="elevenlabs"],
+            [aria-label*="ElevenLabs"],
+            [aria-label*="Powered by"],
+            [title*="ElevenLabs"],
+            [title*="Powered by"],
+            a[href*="elevenlabs"],
+            a[href*="conversational-ai"],
+            .elevenlabs-branding,
+            .powered-by-elevenlabs,
+            .branding-text,
+            .footer-branding,
+            .widget-branding,
+            .convai-branding,
+            [data-branding],
+            [data-powered-by],
+            [data-elevenlabs] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                height: 0 !important;
+                width: 0 !important;
+                overflow: hidden !important;
+            }
+
+            elevenlabs-convai *[style*="font-size: 12px"],
+            elevenlabs-convai *[style*="font-size: 10px"],
+            elevenlabs-convai *[style*="font-size: 11px"] {
+                display: none !important;
+            }
         `;
-        
-        return container;
+        document.head.appendChild(style);
     }
     
     // Load ElevenLabs script
     function loadElevenLabsScript() {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             if (window.customElements && window.customElements.get('elevenlabs-convai')) {
                 resolve();
                 return;
@@ -58,6 +81,8 @@
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
             script.async = true;
+            script.type = 'text/javascript';
+            
             script.onload = () => {
                 // Wait for custom element to be registered
                 const checkRegistration = setInterval(() => {
@@ -70,10 +95,11 @@
                 // Timeout after 10 seconds
                 setTimeout(() => {
                     clearInterval(checkRegistration);
-                    resolve(); // Resolve anyway
+                    resolve();
                 }, 10000);
             };
-            script.onerror = reject;
+            
+            script.onerror = () => resolve();
             document.head.appendChild(script);
         });
     }
@@ -83,138 +109,15 @@
         elevenLabsWidget = document.createElement('elevenlabs-convai');
         elevenLabsWidget.setAttribute('agent-id', agentId);
         
-        // Initial small size styling
-        elevenLabsWidget.style.cssText = `
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            transition: all 0.3s ease;
-            transform-origin: bottom right;
-        `;
+        // Let the widget use its default positioning and behavior
+        // No forced styling - it will behave exactly like normal
         
         return elevenLabsWidget;
     }
     
-    // Monitor widget state changes
-    function monitorWidgetState() {
-        if (!elevenLabsWidget) return;
-        
-        const container = document.getElementById('ai-widget-container');
-        
-        // Check widget dimensions and content
-        function checkWidgetExpansion() {
-            try {
-                const rect = elevenLabsWidget.getBoundingClientRect();
-                const shouldBeExpanded = rect.width > 100 || rect.height > 100;
-                
-                // Check for conversation elements in shadow DOM
-                let hasConversationElements = false;
-                if (elevenLabsWidget.shadowRoot) {
-                    try {
-                        const conversationElements = elevenLabsWidget.shadowRoot.querySelectorAll(
-                            '[class*="conversation"], [class*="chat"], [class*="messages"], [class*="expanded"], [class*="open"]'
-                        );
-                        hasConversationElements = conversationElements.length > 0;
-                    } catch (e) {
-                        // Ignore shadow DOM access errors
-                    }
-                }
-                
-                const newExpandedState = shouldBeExpanded || hasConversationElements;
-                
-                if (newExpandedState !== isExpanded) {
-                    isExpanded = newExpandedState;
-                    updateWidgetSize();
-                }
-            } catch (e) {
-                // Ignore errors
-            }
-        }
-        
-        // Check periodically
-        setInterval(checkWidgetExpansion, 300);
-        
-        // Also check on DOM changes
-        observer = new MutationObserver(() => {
-            setTimeout(checkWidgetExpansion, 100);
-        });
-        
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-        
-        // Check on clicks
-        document.addEventListener('click', () => {
-            setTimeout(checkWidgetExpansion, 200);
-        });
-    }
-    
-    // Update widget size based on state
-    function updateWidgetSize() {
-        if (!elevenLabsWidget) return;
-        
-        const container = document.getElementById('ai-widget-container');
-        const isMobile = window.innerWidth <= 768;
-        
-        if (isExpanded) {
-            // Expanded state
-            if (isMobile) {
-                elevenLabsWidget.style.width = 'calc(100vw - 40px)';
-                elevenLabsWidget.style.height = '70vh';
-                elevenLabsWidget.style.maxWidth = '380px';
-                container.style.bottom = '10px';
-                container.style.right = '10px';
-            } else {
-                elevenLabsWidget.style.width = '380px';
-                elevenLabsWidget.style.height = '520px';
-                container.style.bottom = '20px';
-                container.style.right = '20px';
-            }
-            
-            elevenLabsWidget.style.borderRadius = '20px';
-            container.style.borderRadius = '20px';
-            container.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
-            
-        } else {
-            // Collapsed state
-            elevenLabsWidget.style.width = '80px';
-            elevenLabsWidget.style.height = '80px';
-            elevenLabsWidget.style.borderRadius = '50%';
-            container.style.borderRadius = '50%';
-            container.style.bottom = '20px';
-            container.style.right = '20px';
-            container.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
-        }
-    }
-    
-    // Hide ElevenLabs branding
+    // Hide branding continuously
     function hideBranding() {
-        if (!elevenLabsWidget) return;
-        
-        // Hide branding in main document
-        const brandingSelectors = [
-            '[data-testid*="branding"]',
-            '[data-testid*="powered"]',
-            '[class*="branding"]',
-            '[class*="powered"]',
-            '[class*="elevenlabs"]',
-            '[aria-label*="ElevenLabs"]',
-            '[aria-label*="Powered by"]',
-            '[title*="ElevenLabs"]',
-            '[title*="Powered by"]',
-            'a[href*="elevenlabs"]',
-            'a[href*="conversational-ai"]'
-        ];
-        
-        brandingSelectors.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            elements.forEach(el => {
-                el.style.display = 'none';
-            });
-        });
-        
-        // Hide text-based branding
+        // Hide text-based branding in main document
         const allElements = document.querySelectorAll('*');
         allElements.forEach(el => {
             if (el.textContent && (
@@ -225,12 +128,17 @@
             )) {
                 if (el.textContent.trim().length < 100 && !el.querySelector('elevenlabs-convai')) {
                     el.style.display = 'none';
+                    el.style.visibility = 'hidden';
+                    el.style.opacity = '0';
+                    el.style.height = '0';
+                    el.style.width = '0';
+                    el.style.overflow = 'hidden';
                 }
             }
         });
-        
+
         // Hide branding in shadow DOM
-        if (elevenLabsWidget.shadowRoot) {
+        if (elevenLabsWidget && elevenLabsWidget.shadowRoot) {
             try {
                 const shadowElements = elevenLabsWidget.shadowRoot.querySelectorAll('*');
                 shadowElements.forEach(el => {
@@ -242,62 +150,59 @@
                     }
                 });
             } catch (e) {
-                // Ignore cross-origin errors
+                // Ignore shadow DOM access errors
             }
         }
     }
     
-    // Handle window resize
-    function handleResize() {
-        if (isExpanded) {
-            updateWidgetSize();
-        }
+    // Set up continuous branding removal
+    function setupBrandingRemoval() {
+        // Initial branding removal
+        setTimeout(hideBranding, 500);
+        setTimeout(hideBranding, 1000);
+        setTimeout(hideBranding, 2000);
+        setTimeout(hideBranding, 3000);
+        setTimeout(hideBranding, 5000);
+        setTimeout(hideBranding, 8000);
+        setTimeout(hideBranding, 10000);
+        
+        // Continuous monitoring
+        setInterval(hideBranding, 2000);
+        
+        // Monitor for DOM changes
+        const observer = new MutationObserver(() => {
+            setTimeout(hideBranding, 100);
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
     }
     
     // Initialize widget
     async function init() {
         try {
+            // Add branding hide styles
+            addBrandingHideStyles();
+            
             // Load ElevenLabs script
             await loadElevenLabsScript();
             
-            // Create container
-            const container = createWidgetContainer();
-            document.body.appendChild(container);
-            
-            // Create widget
+            // Create and add widget to page
             const widget = createElevenLabsWidget();
-            container.appendChild(widget);
+            document.body.appendChild(widget);
             
-            // Start monitoring
-            setTimeout(() => {
-                monitorWidgetState();
-                updateWidgetSize();
-            }, 1000);
+            // Setup branding removal
+            setupBrandingRemoval();
             
-            // Hide branding periodically
-            setTimeout(hideBranding, 1000);
-            setTimeout(hideBranding, 2000);
-            setTimeout(hideBranding, 3000);
-            setTimeout(hideBranding, 5000);
-            
-            // Set up branding removal observer
-            const brandingObserver = new MutationObserver(hideBranding);
-            brandingObserver.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-            
-            // Handle resize
-            window.addEventListener('resize', handleResize);
-            
-            // Expose API
+            // Expose simple API
             window.aiWidget = {
-                isExpanded: () => isExpanded,
-                forceUpdate: updateWidgetSize,
+                element: elevenLabsWidget,
                 hideBranding: hideBranding
             };
             
-            console.log('Direct ElevenLabs Widget loaded successfully!');
+            console.log('Native ElevenLabs Widget loaded successfully!');
             
         } catch (error) {
             console.error('Failed to load AI Widget:', error);
