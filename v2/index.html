@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Voice Assistant</title>
     <style>
-        /* Hide ALL Branding */
+        /* Hide ALL Branding - More Aggressive */
         [data-testid*="branding"],
         [data-testid*="powered"],
         [class*="branding"],
         [class*="powered"],
         [class*="elevenlabs"],
+        [class*="footer"],
+        [class*="attribution"],
         [aria-label*="ElevenLabs"],
         [aria-label*="Powered by"],
         [title*="ElevenLabs"],
@@ -42,11 +44,27 @@
             height: 0 !important;
             width: 0 !important;
             overflow: hidden !important;
+            position: absolute !important;
+            left: -9999px !important;
         }
 
+        /* Hide small text elements that might be branding */
         elevenlabs-convai *[style*="font-size: 12px"],
         elevenlabs-convai *[style*="font-size: 10px"],
-        elevenlabs-convai *[style*="font-size: 11px"] {
+        elevenlabs-convai *[style*="font-size: 11px"],
+        elevenlabs-convai *[style*="font-size: 13px"],
+        elevenlabs-convai *[style*="font-size: 14px"] {
+            display: none !important;
+        }
+
+        /* Target common branding patterns */
+        elevenlabs-convai div[style*="font-size: 12px"],
+        elevenlabs-convai span[style*="font-size: 12px"],
+        elevenlabs-convai p[style*="font-size: 12px"],
+        elevenlabs-convai div[style*="opacity: 0.6"],
+        elevenlabs-convai span[style*="opacity: 0.6"],
+        elevenlabs-convai div[style*="color: rgb(156, 163, 175)"],
+        elevenlabs-convai span[style*="color: rgb(156, 163, 175)"] {
             display: none !important;
         }
 
@@ -164,7 +182,8 @@
             loading.style.display = 'none';
             document.body.appendChild(widgetElement);
             
-            // Start branding cleanup
+            // More aggressive branding cleanup schedule
+            setTimeout(hideBranding, 100);
             setTimeout(hideBranding, 500);
             setTimeout(hideBranding, 1000);
             setTimeout(hideBranding, 2000);
@@ -173,8 +192,8 @@
             setTimeout(hideBranding, 8000);
             setTimeout(hideBranding, 10000);
             
-            // Continuous branding removal
-            setInterval(hideBranding, 3000);
+            // Continuous branding removal every 2 seconds
+            setInterval(hideBranding, 2000);
             
             // Monitor widget state changes
             setTimeout(monitorWidgetState, 1000);
@@ -203,35 +222,95 @@
         }
 
         function hideBranding() {
+            // More aggressive branding removal
+            const brandingSelectors = [
+                '[data-testid*="branding"]',
+                '[data-testid*="powered"]',
+                '[class*="branding"]',
+                '[class*="powered"]',
+                '[class*="elevenlabs"]',
+                '[class*="footer"]',
+                '[class*="attribution"]',
+                '[aria-label*="ElevenLabs"]',
+                '[aria-label*="Powered by"]',
+                '[title*="ElevenLabs"]',
+                '[title*="Powered by"]',
+                'a[href*="elevenlabs"]',
+                'a[href*="conversational-ai"]',
+                '.elevenlabs-branding',
+                '.powered-by-elevenlabs',
+                '.branding-text',
+                '.footer-branding',
+                '.widget-branding',
+                '.convai-branding'
+            ];
+            
+            brandingSelectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(el => {
+                    el.style.display = 'none';
+                    el.style.visibility = 'hidden';
+                    el.style.opacity = '0';
+                    el.style.height = '0';
+                    el.style.width = '0';
+                    el.style.overflow = 'hidden';
+                    el.style.position = 'absolute';
+                    el.style.left = '-9999px';
+                    try {
+                        el.remove();
+                    } catch(e) {}
+                });
+            });
+
+            // Hide text-based branding
             const allElements = document.querySelectorAll('*');
             allElements.forEach(el => {
-                if (el.textContent && (
-                    el.textContent.toLowerCase().includes('powered by elevenlabs') ||
-                    el.textContent.toLowerCase().includes('elevenlabs') ||
-                    el.textContent.toLowerCase().includes('conversational ai') ||
-                    el.textContent.toLowerCase().includes('powered by')
-                )) {
-                    if (el.textContent.trim().length < 100 && !el.querySelector('elevenlabs-convai')) {
-                        el.style.display = 'none';
-                        el.style.visibility = 'hidden';
-                        el.style.opacity = '0';
-                        el.style.height = '0';
-                        el.style.width = '0';
-                        el.style.overflow = 'hidden';
+                if (el.textContent && el.textContent.trim()) {
+                    const text = el.textContent.toLowerCase();
+                    if (text.includes('powered by elevenlabs') || 
+                        text.includes('elevenlabs') || 
+                        text.includes('conversational ai') ||
+                        text.includes('powered by')) {
+                        
+                        // Check if it's a small text element (likely branding)
+                        if (el.textContent.trim().length < 200 && !el.querySelector('elevenlabs-convai')) {
+                            el.style.display = 'none';
+                            el.style.visibility = 'hidden';
+                            el.style.opacity = '0';
+                            el.style.height = '0';
+                            el.style.width = '0';
+                            el.style.overflow = 'hidden';
+                            el.style.position = 'absolute';
+                            el.style.left = '-9999px';
+                            
+                            try {
+                                el.remove();
+                            } catch(e) {
+                                el.textContent = '';
+                            }
+                        }
                     }
                 }
             });
 
+            // Target shadow DOM branding
             const widget = document.querySelector('elevenlabs-convai');
             if (widget && widget.shadowRoot) {
                 try {
                     const shadowElements = widget.shadowRoot.querySelectorAll('*');
                     shadowElements.forEach(el => {
-                        if (el.textContent && (
-                            el.textContent.toLowerCase().includes('powered by') ||
-                            el.textContent.toLowerCase().includes('elevenlabs')
-                        )) {
+                        const text = el.textContent ? el.textContent.toLowerCase() : '';
+                        if (text.includes('powered by') || 
+                            text.includes('elevenlabs') || 
+                            text.includes('conversational ai')) {
                             el.style.display = 'none';
+                            el.style.visibility = 'hidden';
+                            el.style.opacity = '0';
+                            try {
+                                el.remove();
+                            } catch(e) {
+                                el.textContent = '';
+                            }
                         }
                     });
                 } catch (e) {}
