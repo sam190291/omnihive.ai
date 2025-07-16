@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Voice Assistant</title>
     <style>
-        /* Hide ALL Branding - More Aggressive */
+        /* Hide ALL Branding - Enhanced */
         [data-testid*="branding"],
         [data-testid*="powered"],
         [class*="branding"],
@@ -48,7 +48,7 @@
             left: -9999px !important;
         }
 
-        /* Hide small text elements that might be branding */
+        /* Hide small text that might be branding */
         elevenlabs-convai *[style*="font-size: 12px"],
         elevenlabs-convai *[style*="font-size: 10px"],
         elevenlabs-convai *[style*="font-size: 11px"],
@@ -57,14 +57,11 @@
             display: none !important;
         }
 
-        /* Target common branding patterns */
-        elevenlabs-convai div[style*="font-size: 12px"],
-        elevenlabs-convai span[style*="font-size: 12px"],
-        elevenlabs-convai p[style*="font-size: 12px"],
-        elevenlabs-convai div[style*="opacity: 0.6"],
-        elevenlabs-convai span[style*="opacity: 0.6"],
+        /* Hide elements with common branding colors */
         elevenlabs-convai div[style*="color: rgb(156, 163, 175)"],
-        elevenlabs-convai span[style*="color: rgb(156, 163, 175)"] {
+        elevenlabs-convai span[style*="color: rgb(156, 163, 175)"],
+        elevenlabs-convai div[style*="opacity: 0.6"],
+        elevenlabs-convai span[style*="opacity: 0.6"] {
             display: none !important;
         }
 
@@ -94,20 +91,6 @@
             text-align: center;
             padding: 20px;
         }
-
-        /* Mobile-specific optimizations */
-        @media (max-width: 768px) {
-            elevenlabs-convai {
-                /* Let the compact variant handle mobile styling */
-            }
-        }
-
-        /* Desktop-specific optimizations */
-        @media (min-width: 769px) {
-            elevenlabs-convai {
-                /* Let the expanded variant handle desktop styling */
-            }
-        }
     </style>
 </head>
 <body>
@@ -119,7 +102,7 @@
         // State management
         let currentState = 'closed';
         let isInFrame = window.parent !== window;
-        let isMobile = window.innerWidth <= 768;
+        let widget = null;
         
         // Send state to parent window
         function sendStateToParent(state) {
@@ -127,7 +110,7 @@
                 window.parent.postMessage({
                     type: 'widget-state',
                     state: state,
-                    isMobile: isMobile
+                    isMobile: window.innerWidth <= 768
                 }, '*');
             }
         }
@@ -156,93 +139,71 @@
             `;
         }
 
-        // Initialize widget with dynamic agent ID and mobile-responsive variant
+        // Check if mobile
+        function isMobile() {
+            return window.innerWidth <= 768;
+        }
+
+        // Initialize widget
         function initializeWidget() {
             const agentId = getAgentId();
             if (!agentId) return;
             
-            // Re-check mobile status at initialization
-            isMobile = window.innerWidth <= 768;
-            
             // Create widget element
-            const widgetElement = document.createElement('elevenlabs-convai');
-            widgetElement.setAttribute('agent-id', agentId);
+            widget = document.createElement('elevenlabs-convai');
+            widget.setAttribute('agent-id', agentId);
             
-            // Only set variant for mobile - let desktop use default
-            if (isMobile) {
-                widgetElement.setAttribute('variant', 'compact');
+            // Set variant based on device - ONLY compact for mobile
+            if (isMobile()) {
+                widget.setAttribute('variant', 'compact');
                 console.log(`Mobile detected (${window.innerWidth}px): Using compact variant`);
             } else {
-                // Don't set variant attribute - let it use default behavior
+                // No variant for desktop = default full size
                 console.log(`Desktop detected (${window.innerWidth}px): Using default variant`);
             }
             
             // Replace loading with widget
             const loading = document.getElementById('loading');
             loading.style.display = 'none';
-            document.body.appendChild(widgetElement);
+            document.body.appendChild(widget);
             
-            // More aggressive branding cleanup schedule
-            setTimeout(hideBranding, 100);
-            setTimeout(hideBranding, 500);
-            setTimeout(hideBranding, 1000);
-            setTimeout(hideBranding, 2000);
-            setTimeout(hideBranding, 3000);
-            setTimeout(hideBranding, 5000);
-            setTimeout(hideBranding, 8000);
-            setTimeout(hideBranding, 10000);
-            
-            // Continuous branding removal every 2 seconds
-            setInterval(hideBranding, 2000);
-            
-            // Monitor widget state changes
-            setTimeout(monitorWidgetState, 1000);
+            // Start aggressive branding removal
+            startBrandingRemoval();
             
             // Handle window resize
             window.addEventListener('resize', handleResize);
+            
+            // Monitor widget state
+            setTimeout(monitorWidgetState, 1000);
         }
 
-        // Handle window resize to update variant
+        // Handle resize
         function handleResize() {
-            const wasMobile = isMobile;
-            isMobile = window.innerWidth <= 768;
+            if (!widget) return;
             
-            if (wasMobile !== isMobile) {
-                const widget = document.querySelector('elevenlabs-convai');
-                if (widget) {
-                    if (isMobile) {
-                        widget.setAttribute('variant', 'compact');
-                        console.log(`Switched to mobile (${window.innerWidth}px): Using compact variant`);
-                    } else {
-                        widget.removeAttribute('variant');
-                        console.log(`Switched to desktop (${window.innerWidth}px): Using default variant`);
-                    }
-                }
+            // Update variant based on new size
+            if (isMobile()) {
+                widget.setAttribute('variant', 'compact');
+                console.log(`Resized to mobile (${window.innerWidth}px): Using compact variant`);
+            } else {
+                widget.removeAttribute('variant');
+                console.log(`Resized to desktop (${window.innerWidth}px): Using default variant`);
             }
         }
 
-        function hideBranding() {
-            // More aggressive branding removal
+        // Aggressive branding removal
+        function removeBranding() {
+            // Remove by selectors
             const brandingSelectors = [
-                '[data-testid*="branding"]',
-                '[data-testid*="powered"]',
                 '[class*="branding"]',
                 '[class*="powered"]',
                 '[class*="elevenlabs"]',
                 '[class*="footer"]',
                 '[class*="attribution"]',
-                '[aria-label*="ElevenLabs"]',
-                '[aria-label*="Powered by"]',
-                '[title*="ElevenLabs"]',
-                '[title*="Powered by"]',
+                '[data-testid*="branding"]',
+                '[data-testid*="powered"]',
                 'a[href*="elevenlabs"]',
-                'a[href*="conversational-ai"]',
-                '.elevenlabs-branding',
-                '.powered-by-elevenlabs',
-                '.branding-text',
-                '.footer-branding',
-                '.widget-branding',
-                '.convai-branding'
+                'a[href*="conversational-ai"]'
             ];
             
             brandingSelectors.forEach(selector => {
@@ -253,7 +214,6 @@
                     el.style.opacity = '0';
                     el.style.height = '0';
                     el.style.width = '0';
-                    el.style.overflow = 'hidden';
                     el.style.position = 'absolute';
                     el.style.left = '-9999px';
                     try {
@@ -262,7 +222,7 @@
                 });
             });
 
-            // Hide text-based branding
+            // Remove by text content
             const allElements = document.querySelectorAll('*');
             allElements.forEach(el => {
                 if (el.textContent && el.textContent.trim()) {
@@ -272,14 +232,12 @@
                         text.includes('conversational ai') ||
                         text.includes('powered by')) {
                         
-                        // Check if it's a small text element (likely branding)
                         if (el.textContent.trim().length < 200 && !el.querySelector('elevenlabs-convai')) {
                             el.style.display = 'none';
                             el.style.visibility = 'hidden';
                             el.style.opacity = '0';
                             el.style.height = '0';
                             el.style.width = '0';
-                            el.style.overflow = 'hidden';
                             el.style.position = 'absolute';
                             el.style.left = '-9999px';
                             
@@ -293,8 +251,7 @@
                 }
             });
 
-            // Target shadow DOM branding
-            const widget = document.querySelector('elevenlabs-convai');
+            // Remove from shadow DOM
             if (widget && widget.shadowRoot) {
                 try {
                     const shadowElements = widget.shadowRoot.querySelectorAll('*');
@@ -317,37 +274,49 @@
             }
         }
 
+        // Start branding removal with aggressive timing
+        function startBrandingRemoval() {
+            // Immediate removal
+            setTimeout(removeBranding, 100);
+            setTimeout(removeBranding, 300);
+            setTimeout(removeBranding, 500);
+            setTimeout(removeBranding, 1000);
+            setTimeout(removeBranding, 2000);
+            setTimeout(removeBranding, 3000);
+            setTimeout(removeBranding, 5000);
+            setTimeout(removeBranding, 8000);
+            setTimeout(removeBranding, 10000);
+            
+            // Continuous removal every 2 seconds
+            setInterval(removeBranding, 2000);
+        }
+
         // Monitor widget state changes
         function monitorWidgetState() {
-            const widget = document.querySelector('elevenlabs-convai');
             if (!widget) {
                 setTimeout(monitorWidgetState, 500);
                 return;
             }
 
-            // Check if widget is expanded or minimized
             function checkWidgetState() {
                 try {
-                    // Look for indicators of expanded state
-                    const isExpanded = widget.shadowRoot && 
-                        widget.shadowRoot.querySelector('[class*="expanded"], [class*="open"], [class*="active"]');
-                    
-                    // Alternative: check for conversation/chat elements
-                    const hasConversation = widget.shadowRoot &&
-                        widget.shadowRoot.querySelector('[class*="conversation"], [class*="chat"], [class*="messages"]');
-                    
-                    // Alternative: check widget size
                     const rect = widget.getBoundingClientRect();
                     const isLargeSize = rect.width > 100 || rect.height > 100;
                     
-                    const newState = (isExpanded || hasConversation || isLargeSize) ? 'open' : 'closed';
+                    let isExpanded = false;
+                    if (widget.shadowRoot) {
+                        isExpanded = widget.shadowRoot.querySelector('[class*="expanded"], [class*="open"], [class*="active"]') ||
+                                    widget.shadowRoot.querySelector('[class*="conversation"], [class*="chat"], [class*="messages"]');
+                    }
+                    
+                    const newState = (isExpanded || isLargeSize) ? 'open' : 'closed';
                     
                     if (newState !== currentState) {
                         currentState = newState;
                         sendStateToParent(currentState);
+                        console.log(`Widget state changed to: ${currentState}`);
                     }
                 } catch (e) {
-                    // Fallback: assume closed if can't detect
                     if (currentState !== 'closed') {
                         currentState = 'closed';
                         sendStateToParent(currentState);
@@ -355,7 +324,7 @@
                 }
             }
 
-            // Check state periodically
+            // Check state every 500ms
             setInterval(checkWidgetState, 500);
             
             // Also check on clicks
@@ -364,32 +333,36 @@
             });
         }
 
-        // Monitor for dynamic content
+        // Monitor for dynamic content changes
         const observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                    setTimeout(hideBranding, 100);
+                    setTimeout(removeBranding, 100);
                 }
             });
         });
 
-        // Wait for ElevenLabs script to load, then initialize
+        // Wait for ElevenLabs script to load
         let checkCount = 0;
         const checkInterval = setInterval(() => {
             if (window.customElements && window.customElements.get('elevenlabs-convai')) {
                 clearInterval(checkInterval);
                 initializeWidget();
+                
+                // Start observing DOM changes
                 observer.observe(document.body, {
                     childList: true,
                     subtree: true
                 });
-            } else if (checkCount++ > 50) { // 5 second timeout
+                
+                console.log('Widget initialized successfully');
+            } else if (checkCount++ > 100) { // 10 second timeout
                 clearInterval(checkInterval);
-                initializeWidget(); // Try anyway
+                showError('Failed to load ElevenLabs widget. Please refresh the page.');
             }
         }, 100);
 
-        // Initial state notification
+        // Send initial state
         setTimeout(() => {
             sendStateToParent('closed');
         }, 1000);
