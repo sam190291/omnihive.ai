@@ -1,262 +1,247 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Assistant</title>
-    <style>
-        /* Hide ALL Branding - Enhanced */
-        [data-testid*="branding"],
-        [data-testid*="powered"],
-        [class*="branding"],
-        [class*="powered"],
-        [class*="elevenlabs"],
-        [class*="footer"],
-        [class*="attribution"],
-        [aria-label*="ElevenLabs"],
-        [aria-label*="Powered by"],
-        [title*="ElevenLabs"],
-        [title*="Powered by"],
-        a[href*="elevenlabs"],
-        a[href*="conversational-ai"],
-        .elevenlabs-branding,
-        .powered-by-elevenlabs,
-        .branding-text,
-        .footer-branding,
-        .widget-branding,
-        .convai-branding,
-        [data-branding],
-        [data-powered-by],
-        [data-elevenlabs],
-        elevenlabs-convai::part(branding),
-        elevenlabs-convai::part(footer),
-        elevenlabs-convai::part(powered-by),
-        elevenlabs-convai footer,
-        elevenlabs-convai .footer,
-        elevenlabs-convai [class*="footer"],
-        elevenlabs-convai > div:last-child,
-        elevenlabs-convai [class*="bottom"],
-        elevenlabs-convai [class*="attribution"],
-        elevenlabs-convai iframe[src*="elevenlabs"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            height: 0 !important;
-            width: 0 !important;
-            overflow: hidden !important;
-            position: absolute !important;
-            left: -9999px !important;
-        }
-
-        /* Hide small text that might be branding */
-        elevenlabs-convai *[style*="font-size: 12px"],
-        elevenlabs-convai *[style*="font-size: 10px"],
-        elevenlabs-convai *[style*="font-size: 11px"],
-        elevenlabs-convai *[style*="font-size: 13px"],
-        elevenlabs-convai *[style*="font-size: 14px"] {
-            display: none !important;
-        }
-
-        /* Hide elements with common branding colors */
-        elevenlabs-convai div[style*="color: rgb(156, 163, 175)"],
-        elevenlabs-convai span[style*="color: rgb(156, 163, 175)"],
-        elevenlabs-convai div[style*="opacity: 0.6"],
-        elevenlabs-convai span[style*="opacity: 0.6"] {
-            display: none !important;
-        }
-
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            color: #666;
-            font-size: 16px;
-        }
-
-        .error {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            color: #e74c3c;
-            text-align: center;
-            padding: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="loading" id="loading">Loading AI Assistant...</div>
+(function() {
+    // Configuration
+    const MOBILE_BREAKPOINT = 768;
     
-    <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
-
-    <script>
-        // State management
-        let currentState = 'closed';
-        let isInFrame = window.parent !== window;
-        let widget = null;
-        
-        // Send state to parent window
-        function sendStateToParent(state) {
-            if (isInFrame) {
-                window.parent.postMessage({
-                    type: 'widget-state',
-                    state: state,
-                    isMobile: window.innerWidth <= 768
-                }, '*');
+    // Extract agent ID from script tag
+    function getAgentIdFromScript() {
+        const scripts = document.getElementsByTagName('script');
+        for (let script of scripts) {
+            if (script.src && script.src.includes('widget-loader.js')) {
+                const agentId = script.getAttribute('data-agent-id');
+                if (agentId) return agentId;
             }
         }
         
-        // Get agent ID from URL parameter
-        function getAgentId() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const agentId = urlParams.get('agent');
-            
-            if (!agentId) {
-                showError('No agent ID provided. Please add ?agent=YOUR_AGENT_ID to the URL.');
-                return null;
+        const currentScript = document.currentScript;
+        if (currentScript) {
+            const agentId = currentScript.getAttribute('data-agent-id');
+            if (agentId) return agentId;
+        }
+        
+        return null;
+    }
+
+    const agentId = getAgentIdFromScript();
+    
+    if (!agentId) {
+        console.error('AI Widget: No agent ID provided.');
+        return;
+    }
+    
+    let elevenLabsWidget = null;
+    let isMobile = false;
+    
+    // Check if device is mobile
+    function checkMobile() {
+        isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+        return isMobile;
+    }
+    
+    // SUPER AGGRESSIVE branding removal
+    function addBrandingHideStyles() {
+        const style = document.createElement('style');
+        style.id = 'ai-widget-branding-hide';
+        style.textContent = `
+            /* Hide ALL possible branding elements */
+            [data-testid*="branding"],
+            [data-testid*="powered"],
+            [class*="branding"],
+            [class*="powered"],
+            [class*="elevenlabs"],
+            [class*="footer"],
+            [class*="attribution"],
+            [aria-label*="ElevenLabs"],
+            [aria-label*="Powered by"],
+            [title*="ElevenLabs"],
+            [title*="Powered by"],
+            a[href*="elevenlabs"],
+            a[href*="conversational-ai"],
+            .elevenlabs-branding,
+            .powered-by-elevenlabs,
+            .branding-text,
+            .footer-branding,
+            .widget-branding,
+            .convai-branding,
+            [data-branding],
+            [data-powered-by],
+            [data-elevenlabs] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                height: 0 !important;
+                width: 0 !important;
+                overflow: hidden !important;
+                position: absolute !important;
+                left: -9999px !important;
+                font-size: 0 !important;
+                line-height: 0 !important;
+            }
+
+            /* Hide small font elements commonly used for branding */
+            elevenlabs-convai *[style*="font-size: 12px"],
+            elevenlabs-convai *[style*="font-size: 10px"],
+            elevenlabs-convai *[style*="font-size: 11px"],
+            elevenlabs-convai *[style*="font-size: 13px"],
+            elevenlabs-convai *[style*="font-size: 14px"],
+            elevenlabs-convai div[style*="opacity: 0.6"],
+            elevenlabs-convai span[style*="opacity: 0.6"],
+            elevenlabs-convai div[style*="color: rgb(156, 163, 175)"],
+            elevenlabs-convai span[style*="color: rgb(156, 163, 175)"],
+            elevenlabs-convai div[style*="color: rgb(107, 114, 128)"],
+            elevenlabs-convai span[style*="color: rgb(107, 114, 128)"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                height: 0 !important;
+                width: 0 !important;
+                font-size: 0 !important;
+            }
+
+            /* Hide footer-like elements */
+            elevenlabs-convai footer,
+            elevenlabs-convai .footer,
+            elevenlabs-convai [class*="footer"],
+            elevenlabs-convai > div:last-child,
+            elevenlabs-convai [class*="bottom"],
+            elevenlabs-convai [class*="attribution"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                height: 0 !important;
+                width: 0 !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Load ElevenLabs script
+    function loadElevenLabsScript() {
+        return new Promise((resolve) => {
+            if (window.customElements && window.customElements.get('elevenlabs-convai')) {
+                resolve();
+                return;
             }
             
-            return agentId;
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
+            script.async = true;
+            script.type = 'text/javascript';
+            
+            script.onload = () => {
+                // Wait for custom element to be registered
+                const checkRegistration = setInterval(() => {
+                    if (window.customElements && window.customElements.get('elevenlabs-convai')) {
+                        clearInterval(checkRegistration);
+                        resolve();
+                    }
+                }, 100);
+                
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    clearInterval(checkRegistration);
+                    resolve();
+                }, 10000);
+            };
+            
+            script.onerror = () => resolve();
+            document.head.appendChild(script);
+        });
+    }
+    
+    // Create ElevenLabs widget
+    function createElevenLabsWidget() {
+        elevenLabsWidget = document.createElement('elevenlabs-convai');
+        elevenLabsWidget.setAttribute('agent-id', agentId);
+        
+        // Use compact variant for mobile, no variant for desktop
+        if (isMobile) {
+            elevenLabsWidget.setAttribute('variant', 'compact');
         }
-
-        function showError(message) {
-            const loading = document.getElementById('loading');
-            loading.innerHTML = `
-                <div class="error">
-                    <h3>Configuration Error</h3>
-                    <p>${message}</p>
-                    <small>Example: ?agent=agent_01jxjyk81cfqrs9zer2vsp4h7e</small>
-                </div>
-            `;
-        }
-
-        // Check if mobile
-        function isMobile() {
-            return window.innerWidth <= 768;
-        }
-
-        // Initialize widget
-        function initializeWidget() {
-            const agentId = getAgentId();
-            if (!agentId) return;
-            
-            // Create widget element
-            widget = document.createElement('elevenlabs-convai');
-            widget.setAttribute('agent-id', agentId);
-            
-            // Set variant based on device - ONLY compact for mobile
-            if (isMobile()) {
-                widget.setAttribute('variant', 'compact');
-                console.log(`Mobile detected (${window.innerWidth}px): Using compact variant`);
-            } else {
-                // No variant for desktop = default full size
-                console.log(`Desktop detected (${window.innerWidth}px): Using default variant`);
-            }
-            
-            // Replace loading with widget
-            const loading = document.getElementById('loading');
-            loading.style.display = 'none';
-            document.body.appendChild(widget);
-            
-            // Start aggressive branding removal
-            startBrandingRemoval();
-            
-            // Handle window resize
-            window.addEventListener('resize', handleResize);
-            
-            // Monitor widget state
-            setTimeout(monitorWidgetState, 1000);
-        }
-
-        // Handle resize
-        function handleResize() {
-            if (!widget) return;
-            
-            // Update variant based on new size
-            if (isMobile()) {
-                widget.setAttribute('variant', 'compact');
-                console.log(`Resized to mobile (${window.innerWidth}px): Using compact variant`);
-            } else {
-                widget.removeAttribute('variant');
-                console.log(`Resized to desktop (${window.innerWidth}px): Using default variant`);
-            }
-        }
-
-        // Aggressive branding removal
-        function removeBranding() {
-            // Remove by selectors
-            const brandingSelectors = [
-                '[class*="branding"]',
-                '[class*="powered"]',
-                '[class*="elevenlabs"]',
-                '[class*="footer"]',
-                '[class*="attribution"]',
-                '[data-testid*="branding"]',
-                '[data-testid*="powered"]',
-                'a[href*="elevenlabs"]',
-                'a[href*="conversational-ai"]'
-            ];
-            
-            brandingSelectors.forEach(selector => {
-                const elements = document.querySelectorAll(selector);
-                elements.forEach(el => {
-                    el.style.display = 'none';
-                    el.style.visibility = 'hidden';
-                    el.style.opacity = '0';
-                    el.style.height = '0';
-                    el.style.width = '0';
-                    el.style.position = 'absolute';
-                    el.style.left = '-9999px';
-                    try {
-                        el.remove();
-                    } catch(e) {}
-                });
-            });
-
-            // Remove by text content
-            const allElements = document.querySelectorAll('*');
-            allElements.forEach(el => {
-                if (el.textContent && el.textContent.trim()) {
-                    const text = el.textContent.toLowerCase();
-                    if (text.includes('powered by elevenlabs') || 
-                        text.includes('elevenlabs') || 
-                        text.includes('conversational ai') ||
-                        text.includes('powered by')) {
+        
+        return elevenLabsWidget;
+    }
+    
+    // SUPER AGGRESSIVE branding removal function
+    function hideBranding() {
+        // Method 1: Remove by text content
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(el => {
+            if (el.textContent && el.textContent.trim()) {
+                const text = el.textContent.toLowerCase().trim();
+                if (text.includes('powered by elevenlabs') || 
+                    text.includes('elevenlabs') || 
+                    text.includes('conversational ai') ||
+                    text.includes('powered by') ||
+                    text.match(/^[a-z]+labs$/i)) {
+                    
+                    // Only target small text elements (likely branding)
+                    if (el.textContent.trim().length < 200 && !el.querySelector('elevenlabs-convai')) {
+                        el.style.display = 'none';
+                        el.style.visibility = 'hidden';
+                        el.style.opacity = '0';
+                        el.style.height = '0';
+                        el.style.width = '0';
+                        el.style.overflow = 'hidden';
+                        el.style.position = 'absolute';
+                        el.style.left = '-9999px';
+                        el.style.fontSize = '0';
+                        el.style.lineHeight = '0';
                         
-                        if (el.textContent.trim().length < 200 && !el.querySelector('elevenlabs-convai')) {
-                            el.style.display = 'none';
-                            el.style.visibility = 'hidden';
-                            el.style.opacity = '0';
-                            el.style.height = '0';
-                            el.style.width = '0';
-                            el.style.position = 'absolute';
-                            el.style.left = '-9999px';
-                            
-                            try {
-                                el.remove();
-                            } catch(e) {
-                                el.textContent = '';
-                            }
+                        // Try to remove the element completely
+                        try {
+                            el.remove();
+                        } catch(e) {
+                            // If removal fails, empty the content
+                            el.textContent = '';
+                            el.innerHTML = '';
                         }
                     }
                 }
-            });
-
-            // Remove from shadow DOM
-            if (widget && widget.shadowRoot) {
+            }
+        });
+        
+        // Method 2: Remove by common selectors
+        const brandingSelectors = [
+            '[class*="branding"]',
+            '[class*="powered"]',
+            '[class*="elevenlabs"]',
+            '[class*="footer"]',
+            '[class*="attribution"]',
+            '[data-testid*="branding"]',
+            '[data-testid*="powered"]',
+            'a[href*="elevenlabs"]',
+            'a[href*="conversational-ai"]',
+            'div[style*="font-size: 12px"]',
+            'span[style*="font-size: 12px"]',
+            'div[style*="opacity: 0.6"]',
+            'span[style*="opacity: 0.6"]',
+            'div[style*="color: rgb(156, 163, 175)"]',
+            'span[style*="color: rgb(156, 163, 175)"]'
+        ];
+        
+        brandingSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+                el.style.display = 'none';
+                el.style.visibility = 'hidden';
+                el.style.opacity = '0';
+                el.style.height = '0';
+                el.style.width = '0';
+                el.style.position = 'absolute';
+                el.style.left = '-9999px';
                 try {
-                    const shadowElements = widget.shadowRoot.querySelectorAll('*');
-                    shadowElements.forEach(el => {
-                        const text = el.textContent ? el.textContent.toLowerCase() : '';
+                    el.remove();
+                } catch(e) {}
+            });
+        });
+
+        // Method 3: Target shadow DOM if accessible
+        if (elevenLabsWidget && elevenLabsWidget.shadowRoot) {
+            try {
+                const shadowElements = elevenLabsWidget.shadowRoot.querySelectorAll('*');
+                shadowElements.forEach(el => {
+                    if (el.textContent) {
+                        const text = el.textContent.toLowerCase().trim();
                         if (text.includes('powered by') || 
                             text.includes('elevenlabs') || 
                             text.includes('conversational ai')) {
@@ -267,105 +252,99 @@
                                 el.remove();
                             } catch(e) {
                                 el.textContent = '';
+                                el.innerHTML = '';
                             }
                         }
-                    });
-                } catch (e) {}
-            }
-        }
-
-        // Start branding removal with aggressive timing
-        function startBrandingRemoval() {
-            // Immediate removal
-            setTimeout(removeBranding, 100);
-            setTimeout(removeBranding, 300);
-            setTimeout(removeBranding, 500);
-            setTimeout(removeBranding, 1000);
-            setTimeout(removeBranding, 2000);
-            setTimeout(removeBranding, 3000);
-            setTimeout(removeBranding, 5000);
-            setTimeout(removeBranding, 8000);
-            setTimeout(removeBranding, 10000);
-            
-            // Continuous removal every 2 seconds
-            setInterval(removeBranding, 2000);
-        }
-
-        // Monitor widget state changes
-        function monitorWidgetState() {
-            if (!widget) {
-                setTimeout(monitorWidgetState, 500);
-                return;
-            }
-
-            function checkWidgetState() {
-                try {
-                    const rect = widget.getBoundingClientRect();
-                    const isLargeSize = rect.width > 100 || rect.height > 100;
-                    
-                    let isExpanded = false;
-                    if (widget.shadowRoot) {
-                        isExpanded = widget.shadowRoot.querySelector('[class*="expanded"], [class*="open"], [class*="active"]') ||
-                                    widget.shadowRoot.querySelector('[class*="conversation"], [class*="chat"], [class*="messages"]');
                     }
-                    
-                    const newState = (isExpanded || isLargeSize) ? 'open' : 'closed';
-                    
-                    if (newState !== currentState) {
-                        currentState = newState;
-                        sendStateToParent(currentState);
-                        console.log(`Widget state changed to: ${currentState}`);
-                    }
-                } catch (e) {
-                    if (currentState !== 'closed') {
-                        currentState = 'closed';
-                        sendStateToParent(currentState);
-                    }
-                }
-            }
-
-            // Check state every 500ms
-            setInterval(checkWidgetState, 500);
-            
-            // Also check on clicks
-            document.addEventListener('click', () => {
-                setTimeout(checkWidgetState, 100);
-            });
-        }
-
-        // Monitor for dynamic content changes
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                    setTimeout(removeBranding, 100);
-                }
-            });
-        });
-
-        // Wait for ElevenLabs script to load
-        let checkCount = 0;
-        const checkInterval = setInterval(() => {
-            if (window.customElements && window.customElements.get('elevenlabs-convai')) {
-                clearInterval(checkInterval);
-                initializeWidget();
-                
-                // Start observing DOM changes
-                observer.observe(document.body, {
-                    childList: true,
-                    subtree: true
                 });
-                
-                console.log('Widget initialized successfully');
-            } else if (checkCount++ > 100) { // 10 second timeout
-                clearInterval(checkInterval);
-                showError('Failed to load ElevenLabs widget. Please refresh the page.');
+            } catch (e) {
+                // Ignore shadow DOM access errors
             }
-        }, 100);
-
-        // Send initial state
-        setTimeout(() => {
-            sendStateToParent('closed');
-        }, 1000);
-    </script>
-</body>
-</html>
+        }
+    }
+    
+    // Set up SUPER AGGRESSIVE branding removal
+    function setupBrandingRemoval() {
+        // Start immediately and run frequently
+        hideBranding();
+        setTimeout(hideBranding, 100);
+        setTimeout(hideBranding, 300);
+        setTimeout(hideBranding, 500);
+        setTimeout(hideBranding, 1000);
+        setTimeout(hideBranding, 2000);
+        setTimeout(hideBranding, 3000);
+        setTimeout(hideBranding, 5000);
+        setTimeout(hideBranding, 8000);
+        setTimeout(hideBranding, 10000);
+        
+        // Continuous monitoring every 1 second
+        setInterval(hideBranding, 1000);
+        
+        // Monitor for DOM changes
+        const observer = new MutationObserver(() => {
+            setTimeout(hideBranding, 50);
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+    
+    // Handle window resize
+    function handleResize() {
+        const wasMobile = isMobile;
+        checkMobile();
+        
+        if (wasMobile !== isMobile && elevenLabsWidget) {
+            // Device type changed - update variant
+            if (isMobile) {
+                elevenLabsWidget.setAttribute('variant', 'compact');
+            } else {
+                elevenLabsWidget.removeAttribute('variant');
+            }
+        }
+    }
+    
+    // Initialize widget
+    async function init() {
+        try {
+            checkMobile();
+            
+            // Add branding hide styles first
+            addBrandingHideStyles();
+            
+            // Load ElevenLabs script
+            await loadElevenLabsScript();
+            
+            // Create and add widget to page
+            const widget = createElevenLabsWidget();
+            document.body.appendChild(widget);
+            
+            // Setup SUPER AGGRESSIVE branding removal
+            setupBrandingRemoval();
+            
+            // Event listeners
+            window.addEventListener('resize', handleResize);
+            
+            // Expose simple API
+            window.aiWidget = {
+                element: elevenLabsWidget,
+                isMobile: () => isMobile,
+                hideBranding: hideBranding
+            };
+            
+            console.log(`ElevenLabs Widget loaded (${isMobile ? 'compact' : 'default'} variant)`);
+            
+        } catch (error) {
+            console.error('Failed to load AI Widget:', error);
+        }
+    }
+    
+    // Wait for DOM
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
